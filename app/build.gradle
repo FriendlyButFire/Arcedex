@@ -1,7 +1,8 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'kotlin-kapt'
+    id 'com.google.devtools.ksp'   // sostituisce 'kotlin-kapt'
+    id 'org.jetbrains.kotlin.plugin.compose'
 }
 
 android {
@@ -9,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId "jzam.arcedex"
-        minSdk 21
+        minSdk 23
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -36,9 +37,6 @@ android {
     buildFeatures {
         compose true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion compose_version
-    }
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
@@ -61,7 +59,7 @@ dependencies {
 
     // Room components
     implementation "androidx.room:room-ktx:$rootProject.roomVersion"
-    kapt "androidx.room:room-compiler:$rootProject.roomVersion"
+    ksp "androidx.room:room-compiler:$rootProject.roomVersion"
     androidTestImplementation "androidx.room:room-testing:$rootProject.roomVersion"
 
     // Lifecycle components
