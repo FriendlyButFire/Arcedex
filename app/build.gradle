@@ -1,10 +1,11 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
     id 'com.google.devtools.ksp'
-    id 'org.jetbrains.kotlin.plugin.compose'// sostituisce 'kotlin-kapt'
+    id 'org.jetbrains.kotlin.plugin.compose'//  'kotlin-kapt'
 }
-
+kotlin {
+    jvmToolchain(17)
+}
 android {
     compileSdk 37
 
@@ -26,13 +27,6 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-    }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = '1.8'
     }
     buildFeatures {
         compose true
@@ -68,7 +62,7 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-common-java8:$rootProject.lifecycleVersion"
 
     // Kotlin components
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.10"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.0"
     api "org.jetbrains.kotlinx:kotlinx-coroutines-core:$rootProject.coroutines"
     api "org.jetbrains.kotlinx:kotlinx-coroutines-android:$rootProject.coroutines"
 
