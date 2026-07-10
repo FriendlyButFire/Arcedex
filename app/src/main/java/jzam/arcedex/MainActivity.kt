@@ -4,6 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,27 +14,30 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jzam.arcedex.models.*
-import jzam.arcedex.ui.theme.ArcedexTheme
-import jzam.arcedex.ui.theme.Typography
+import jzam.arcedex.ui.theme.*
 import jzam.arcedex.utils.*
 import jzam.arcedex.viewmodels.PokeResearchViewModel
 import jzam.arcedex.viewmodels.PokeResearchViewModelFactory
@@ -73,6 +79,7 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
     val searchedText by pokeResearchViewModel.searchedText.observeAsState()
     val userPoints by pokeResearchViewModel.userPoints.observeAsState()
     val pokemonToResearchTasks by pokeResearchViewModel.pokemonToResearchTasks.observeAsState()
+    val hideCompleted by pokeResearchViewModel.hideCompleted.observeAsState(false)
     val language = getSupportedLanguage(LocaleList.current)
 
     pokeResearchViewModel.setLanguage(language)
@@ -89,11 +96,14 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
         InitializationScreen()
     } else {
         Scaffold(
+            backgroundColor = Background,
             topBar = {
                 ArcedexTopBar(
                     language = language,
                     userPoints = userPoints!!,
-                    onSortChosen = pokeResearchViewModel::setSort
+                    hideCompleted = hideCompleted,
+                    onSortChosen = pokeResearchViewModel::setSort,
+                    onHideCompletedToggled = pokeResearchViewModel::toggleHideCompleted
                 )
             },
             bottomBar = {
@@ -106,30 +116,73 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                 )
             }
         ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding)) {
+            Box(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .background(Background)
+            ) {
+                val displayedPokedex = if (hideCompleted) {
+                    pokedex!!.filter { pokemon ->
+                        val prog = researchProgress!!.find { it.name == pokemon.name }
+                        //Keep Pokemon with no progress entry (not yet started) or not fully done
+                        prog == null || (prog.pointsDone + prog.bonusEarned) < prog.pointsTotal
+                    }
+                } else {
+                    pokedex!!
+                }
                 Pokedex(
                     language = language,
-                    pokedex = pokedex!!,
+                    pokedex = displayedPokedex,
                     progress = researchProgress!!,
                     pokeSort = pokeSort!!,
                     onGoalClick = pokeResearchViewModel::onGoalClick,
                     pokemonToResearchTasks = pokemonToResearchTasks,
-                    onMoveClick = pokeResearchViewModel::searchPokedex
+                    onMoveClick = pokeResearchViewModel::searchPokedex,
+                    hideCompleted = hideCompleted
                 )
             }
         }
     }
 }
 
-//App's top bar - Shows app name, research rank progress, and Sort button
+//App's top bar - Shows app name, research rank progress, and Sort/Hide-completed buttons
 @Composable
-fun ArcedexTopBar(language: SupportedLanguage, userPoints: Int, onSortChosen: (PokeSort) -> Unit) {
-    TopAppBar(
-        title = { Text(stringResource(R.string.app_name)) },
-        actions = {
-            ResearchRankInfo(language, userPoints)
-            SortButton(onSortChosen)
+fun ArcedexTopBar(
+    language: SupportedLanguage, userPoints: Int, hideCompleted: Boolean,
+    onSortChosen: (PokeSort) -> Unit, onHideCompletedToggled: () -> Unit
+) {
+    Surface(color = Surface, elevation = 4.dp) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.app_name),
+                    style = Typography.h6,
+                    color = TextPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+                ResearchRankInfo(language, userPoints)
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row {
+                HideCompletedButton(hideCompleted, onHideCompletedToggled)
+                Spacer(modifier = Modifier.width(8.dp))
+                SortButton(onSortChosen)
+            }
         }
+    }
+}
+
+//Toggle button to show/hide Pokemon and tasks that are already fully completed
+@Composable
+fun HideCompletedButton(hideCompleted: Boolean, onToggle: () -> Unit) {
+    PillButton(
+        text = stringResource(if (hideCompleted) R.string.show_completed_label else R.string.hide_completed_label),
+        selected = hideCompleted,
+        onClick = onToggle
     )
 }
 
@@ -139,17 +192,21 @@ fun ResearchRankInfo(language: SupportedLanguage, userPoints: Int) {
     val researchRank = getResearchRank(language, userPoints)
     val pointsToNext = getPointsToNextRankText(language, userPoints)
     val barProgress = getRankProgress(userPoints.toFloat())
+    val totalPointsPossible = getTotalPointsPossible()
 
-    Column {
-        Text(researchRank, style = Typography.button)
+    Column(horizontalAlignment = Alignment.End) {
+        Text(researchRank, style = Typography.button, color = AccentRed)
         LinearProgressIndicator(
             progress = barProgress,
-            color = MaterialTheme.colors.onPrimary,
+            color = AccentRed,
+            backgroundColor = SurfaceBorder,
             modifier = Modifier
-                .width(130.dp)
-                .padding(vertical = 8.dp)
+                .width(120.dp)
+                .padding(vertical = 6.dp)
+                .clip(RoundedCornerShape(50))
         )
-        Text(pointsToNext, style = Typography.caption)
+        Text(pointsToNext, style = Typography.caption, color = TextSecondary)
+        Text("$userPoints / $totalPointsPossible", style = Typography.caption, color = TextSecondary)
     }
 }
 
@@ -158,35 +215,54 @@ fun ResearchRankInfo(language: SupportedLanguage, userPoints: Int) {
 fun SortButton(onSortChosen: (PokeSort) -> Unit) {
     var sortExpanded by remember { mutableStateOf(false) }
 
-    Column {
-        Card(
-            modifier = Modifier
-                .padding(horizontal = 8.dp)
-                .border(1.dp, Color.White)
-                .clickable { sortExpanded = true }
-        ) {
-            Text(
-                stringResource(R.string.sort_label),
-                color = MaterialTheme.colors.onPrimary,
-                modifier = Modifier
-                    .background(MaterialTheme.colors.primary)
-                    .padding(all = 8.dp)
-            )
-        }
+    Box {
+        PillButton(
+            text = stringResource(R.string.sort_label),
+            selected = false,
+            onClick = { sortExpanded = true }
+        )
         DropdownMenu(
             expanded = sortExpanded,
-            onDismissRequest = { sortExpanded = false }
+            onDismissRequest = { sortExpanded = false },
+            modifier = Modifier.background(SurfaceElevated)
         ) {
-            DropdownMenuItem(onClick = { onSortChosen(PokeSort.HISUI) }) {
-                Text(stringResource(R.string.hisui_sort_label))
+            DropdownMenuItem(onClick = {
+                onSortChosen(PokeSort.HISUI)
+                sortExpanded = false
+            }) {
+                Text(stringResource(R.string.hisui_sort_label), color = TextPrimary)
             }
-            DropdownMenuItem(onClick = { onSortChosen(PokeSort.ALPHABETICAL) }) {
-                Text(stringResource(R.string.alpha_sort_label))
+            DropdownMenuItem(onClick = {
+                onSortChosen(PokeSort.ALPHABETICAL)
+                sortExpanded = false
+            }) {
+                Text(stringResource(R.string.alpha_sort_label), color = TextPrimary)
             }
-            DropdownMenuItem(onClick = { onSortChosen(PokeSort.NATIONAL) }) {
-                Text(stringResource(R.string.national_sort_label))
+            DropdownMenuItem(onClick = {
+                onSortChosen(PokeSort.NATIONAL)
+                sortExpanded = false
+            }) {
+                Text(stringResource(R.string.national_sort_label), color = TextPrimary)
             }
         }
+    }
+}
+
+//Small reusable pill-shaped button used across the top bar and bottom bar
+@Composable
+fun PillButton(text: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        shape = PillShape,
+        color = if (selected) AccentRed else SurfaceElevated,
+        border = if (selected) null else BorderStroke(1.dp, SurfaceBorder),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Text(
+            text,
+            style = Typography.button,
+            color = if (selected) Background else TextPrimary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
     }
 }
 
@@ -197,10 +273,14 @@ fun Pokedex(
     pokedex: List<Pokemon>, progress: List<ResearchProgress>,
     pokeSort: PokeSort, onGoalClick: (PokeResearch, Int) -> Unit,
     pokemonToResearchTasks: Map<String, MutableList<PokeResearch>>?,
-    onMoveClick: (String) -> Unit
+    onMoveClick: (String) -> Unit,
+    hideCompleted: Boolean
 ) {
     if (pokedex.isNotEmpty()) {
-        LazyColumn {
+        LazyColumn(
+            contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             items(pokedex) {
                 PokedexPokemon(
                     language = language,
@@ -209,7 +289,8 @@ fun Pokedex(
                     progress = progress,
                     pokeSort = pokeSort,
                     onGoalClick = onGoalClick,
-                    onMoveClick = onMoveClick
+                    onMoveClick = onMoveClick,
+                    hideCompleted = hideCompleted
                 )
             }
         }
@@ -228,6 +309,7 @@ fun PokedexPokemon(
     pokeSort: PokeSort,
     onGoalClick: (PokeResearch, Int) -> Unit,
     onMoveClick: (String) -> Unit,
+    hideCompleted: Boolean,
 ) {
 
     var isExpanded by remember { mutableStateOf(false) }
@@ -238,9 +320,20 @@ fun PokedexPokemon(
         name = pokemon.name
     }
 
-    Row(
+    //When the filter is on, drop tasks whose goal has already been fully reached
+    val visibleTasks = if (hideCompleted) {
+        tasks?.filter { it.goalProgress < it.totalGoals }
+    } else {
+        tasks
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        backgroundColor = if (isExpanded) SurfaceElevated else Surface,
+        elevation = if (isExpanded) 6.dp else 1.dp,
         modifier = Modifier
-            .padding(top = 16.dp)
+            .fillMaxWidth()
+            .animateContentSize()
     ) {
         Column {
             PokemonHeaderRow(
@@ -251,9 +344,21 @@ fun PokedexPokemon(
                 isExpanded = isExpanded,
                 onClick = { isExpanded = !isExpanded })
             if (isExpanded) {
-                if (tasks != null) {
-                    for (item in tasks) {
-                        TaskRow(language, item, onGoalClick, onMoveClick)
+                Divider(color = SurfaceBorder, thickness = 1.dp)
+                if (visibleTasks != null) {
+                    if (visibleTasks.isEmpty()) {
+                        Text(
+                            stringResource(R.string.search_fail_message),
+                            color = TextSecondary,
+                            style = Typography.body2,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            for (item in visibleTasks) {
+                                TaskRow(language, item, onGoalClick, onMoveClick)
+                            }
+                        }
                     }
                 }
             }
@@ -269,38 +374,21 @@ fun PokemonHeaderRow(
     onClick: () -> Unit
 ) {
     val pokeProgress = progress.find { it.name == pokemon.name }
-    val bgColor: Color
-    val alpha: Float
 
     if (pokeProgress != null) {
-        if (pokeProgress.pointsDone == 0) {
-            alpha = .2f
-        } else {
-            alpha = 1f
-        }
-        bgColor = when {
-            isExpanded -> {
-                MaterialTheme.colors.primaryVariant
-            }
-            pokeProgress.pointsDone == 0 -> {
-                Color.Gray
-            }
-            else -> {
-                MaterialTheme.colors.background
-            }
-        }
+        val started = pokeProgress.pointsDone > 0
+        val avatarAlpha = if (started) 1f else 0.35f
+        val chevronRotation by animateFloatAsState(if (isExpanded) 180f else 0f)
 
-        Row(modifier = Modifier
-            .background(MaterialTheme.colors.secondary)
-            .fillMaxWidth()
-            .clickable { onClick() }) {
-            PokemonImage(
-                imgId = pokemon.imgId,
-                size = 50,
-                desc = stringResource(id = R.string.pokemon_pic_desc),
-                color = bgColor,
-                alpha = alpha
-            )
+        Row(
+            modifier = Modifier
+                .clickable { onClick() }
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PokemonAvatar(imgId = pokemon.imgId, alpha = avatarAlpha)
+            Spacer(modifier = Modifier.width(12.dp))
             PokemonProgress(
                 language = language,
                 modifier = Modifier.weight(1f),
@@ -309,11 +397,40 @@ fun PokemonHeaderRow(
                 pokeSort = pokeSort
             )
             ProgressPokeballImage(pokeProgress)
+            Text(
+                "\u25BE",
+                color = TextSecondary,
+                fontSize = 18.sp,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .rotate(chevronRotation)
+            )
         }
     }
 }
 
-//Generic image format for this screen
+//Circular Pokemon avatar with a tinted ring background
+@Composable
+fun PokemonAvatar(imgId: Int, alpha: Float) {
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .clip(CircleShape)
+            .background(SurfaceElevated),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = imgId),
+            contentDescription = stringResource(id = R.string.pokemon_pic_desc),
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .alpha(alpha)
+        )
+    }
+}
+
+//Generic image format used for icons elsewhere on screen (points icon, pokeball, etc.)
 @Composable
 fun PokemonImage(imgId: Int, size: Int, desc: String, color: Color, alpha: Float) {
     Image(
@@ -321,38 +438,50 @@ fun PokemonImage(imgId: Int, size: Int, desc: String, color: Color, alpha: Float
         contentDescription = desc,
         modifier = Modifier
             .size(size.dp)
-            .clip(RectangleShape)
-            .border(1.5.dp, MaterialTheme.colors.secondary, RectangleShape)
-            .background(color)
             .alpha(alpha)
     )
 }
 
-//Display Pokemon's basic info and research progress summary
+//Display Pokemon's basic info, a slim per-Pokemon progress bar, and research progress summary
 @Composable
 fun PokemonProgress(
     language: SupportedLanguage,
     modifier: Modifier, pokemon: Pokemon, pokeProgress: ResearchProgress,
     pokeSort: PokeSort
 ) {
+    val fraction = if (pokeProgress.goalsTotal > 0) {
+        (pokeProgress.goalsDone.toFloat() / pokeProgress.goalsTotal.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+    val complete = pokeProgress.pointsDone + pokeProgress.bonusEarned == pokeProgress.pointsTotal
+
     Column(modifier = modifier) {
-        Row {
-            if (pokeSort == PokeSort.NATIONAL) {
-                Text(
-                    formatPokemonId(pokemon.natId), color = MaterialTheme.colors.onPrimary,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
-            } else if (pokeSort == PokeSort.HISUI) {
-                Text(
-                    formatPokemonId(pokemon.hisuiId), color = MaterialTheme.colors.onPrimary,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val idText = when (pokeSort) {
+                PokeSort.NATIONAL -> formatPokemonId(pokemon.natId)
+                PokeSort.HISUI -> formatPokemonId(pokemon.hisuiId)
+                else -> ""
+            }
+            if (idText.isNotBlank()) {
+                Text(idText, color = TextSecondary, style = Typography.body2)
+                Spacer(modifier = Modifier.width(6.dp))
             }
             Text(
-                translate(language, pokemon.name), color = MaterialTheme.colors.onPrimary,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                translate(language, pokemon.name),
+                color = TextPrimary,
+                style = Typography.subtitle1
             )
         }
+        Spacer(modifier = Modifier.height(6.dp))
+        LinearProgressIndicator(
+            progress = fraction,
+            color = if (complete) AccentGreen else AccentRed,
+            backgroundColor = SurfaceBorder,
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(5.dp)
+                .clip(RoundedCornerShape(50))
+        )
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             formatPokemonResearchInfo(
                 lang = language,
@@ -361,8 +490,8 @@ fun PokemonProgress(
                 pointsDone = pokeProgress.pointsDone + pokeProgress.bonusEarned,
                 pointsTotal = pokeProgress.pointsTotal
             ),
-            color = MaterialTheme.colors.onPrimary,
-            modifier = Modifier.padding(horizontal = 8.dp)
+            color = TextSecondary,
+            style = Typography.caption
         )
     }
 }
@@ -370,17 +499,16 @@ fun PokemonProgress(
 //Show Pokeball image if enough research points have been earned for a Pokemon.
 @Composable
 fun ProgressPokeballImage(pokeProgress: ResearchProgress) {
-    val pokeballImg: Int
     if (pokeProgress.pointsDone >= 100) {
-        if (pokeProgress.pointsDone + pokeProgress.bonusEarned == pokeProgress.pointsTotal) {
-            pokeballImg = R.drawable.masterball
+        val pokeballImg = if (pokeProgress.pointsDone + pokeProgress.bonusEarned == pokeProgress.pointsTotal) {
+            R.drawable.masterball
         } else {
-            pokeballImg = R.drawable.pokeball
+            R.drawable.pokeball
         }
         PokemonImage(
-            imgId = pokeballImg, size = 50,
+            imgId = pokeballImg, size = 32,
             desc = stringResource(R.string.pokeball_pic_desc),
-            color = MaterialTheme.colors.background,
+            color = Background,
             alpha = 1f
         )
     }
@@ -394,63 +522,29 @@ fun TaskRow(
     onGoalClick: (PokeResearch, Int) -> Unit,
     onMoveClick: (String) -> Unit
 ) {
-
     Row(
         modifier = Modifier
-            .padding(8.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         PointsIcon(points = pokemonTask.points)
         TaskText(language, pokemonTask.task, onMoveClick)
-        GoalText(
-            language = language,
-            goal = pokemonTask.goal1,
-            goalNum = 1,
-            pokemonTask,
-            onGoalClick
-        )
-        GoalText(
-            language = language,
-            goal = pokemonTask.goal2,
-            goalNum = 2,
-            pokemonTask,
-            onGoalClick
-        )
-        GoalText(
-            language = language,
-            goal = pokemonTask.goal3,
-            goalNum = 3,
-            pokemonTask,
-            onGoalClick
-        )
-        GoalText(
-            language = language,
-            goal = pokemonTask.goal4,
-            goalNum = 4,
-            pokemonTask,
-            onGoalClick
-        )
-        GoalText(
-            language = language,
-            goal = pokemonTask.goal5,
-            goalNum = 5,
-            pokemonTask,
-            onGoalClick
-        )
+        GoalText(language = language, goal = pokemonTask.goal1, goalNum = 1, pokemonTask, onGoalClick)
+        GoalText(language = language, goal = pokemonTask.goal2, goalNum = 2, pokemonTask, onGoalClick)
+        GoalText(language = language, goal = pokemonTask.goal3, goalNum = 3, pokemonTask, onGoalClick)
+        GoalText(language = language, goal = pokemonTask.goal4, goalNum = 4, pokemonTask, onGoalClick)
+        GoalText(language = language, goal = pokemonTask.goal5, goalNum = 5, pokemonTask, onGoalClick)
     }
 }
 
 //Points icon. 20 = double points, 10 = standard points
 @Composable
 fun PointsIcon(points: Int) {
-    val color: Color
-    if (points == 20) {
-        color = MaterialTheme.colors.primary
-    } else {
-        color = Color.White
-    }
+    val color = if (points == 20) AccentRed else TextSecondary
     PokemonImage(
-        imgId = R.drawable.double_points, size = 25,
+        imgId = R.drawable.double_points, size = 22,
         desc = stringResource(id = R.string.points_icon_desc), color = color, alpha = 1f
     )
 }
@@ -460,8 +554,10 @@ fun PointsIcon(points: Int) {
 fun RowScope.TaskText(language: SupportedLanguage, task: String, onMoveClick: (String) -> Unit) {
     Column(modifier = Modifier.weight(1f)) {
         Text(
-            translate(language, task), modifier = Modifier
-                .padding(horizontal = 8.dp)
+            translate(language, task),
+            color = TextPrimary,
+            style = Typography.body2,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
 
         val type = getMoveType(task)
@@ -469,18 +565,18 @@ fun RowScope.TaskText(language: SupportedLanguage, task: String, onMoveClick: (S
         val translatedType = translate(language, type)
         if (type.isNotBlank()) {
             val bgColor = getTypeColor(type)
-            Card(
+            Surface(
+                shape = PillShape,
+                color = bgColor,
                 modifier = Modifier
-                    .padding(horizontal = 8.dp)
-                    .border(1.dp, Color.White)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
                     .clickable { onMoveClick(("$translatedType$typeText")) }
             ) {
                 Text(
                     text = translate(language, type),
-                    color = MaterialTheme.colors.onPrimary,
-                    modifier = Modifier
-                        .background(bgColor)
-                        .padding(all = 8.dp)
+                    color = Color.White,
+                    style = Typography.caption,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                 )
             }
         }
@@ -494,19 +590,21 @@ fun GoalText(
     goal: String, goalNum: Int, pokemonTask: PokeResearch,
     onGoalClick: (PokeResearch, Int) -> Unit
 ) {
-    var backgroundColor = MaterialTheme.colors.background
-
-    if (pokemonTask.goalProgress >= goalNum) backgroundColor = MaterialTheme.colors.primaryVariant
     if (goal.isNotBlank()) {
-        Card(
+        val reached = pokemonTask.goalProgress >= goalNum
+        Surface(
+            shape = CircleShape,
+            color = if (reached) AccentGreen else SurfaceElevated,
+            border = if (reached) null else BorderStroke(1.dp, SurfaceBorder),
             modifier = Modifier
-                .border(1.dp, MaterialTheme.colors.secondaryVariant)
+                .padding(horizontal = 2.dp)
                 .clickable { onGoalClick(pokemonTask, goalNum) }
         ) {
             Text(
-                translate(lang = language, text = goal), modifier = Modifier
-                    .background(backgroundColor)
-                    .padding(all = 8.dp)
+                translate(lang = language, text = goal),
+                color = if (reached) Background else TextSecondary,
+                style = Typography.caption,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
     }
@@ -525,16 +623,27 @@ fun ShowEmptySearch() {
                 pointsDone = 1
             )
         )
-    Column(Modifier.padding(8.dp)) {
-        PokemonHeaderRow(language = SupportedLanguage.ENGLISH,
-            pokemon = emptyPokemon,
-            progress = emptyResearch,
-            pokeSort = PokeSort.HISUI,
-            isExpanded = false,
-            onClick = {})
-        Text(text = stringResource(R.string.red_quote), fontSize = 50.sp)
-        Text(text = stringResource(R.string.red_quote), fontSize = 50.sp)
-        Text(text = stringResource(R.string.search_fail_message))
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Background)
+            .padding(16.dp)
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            backgroundColor = Surface,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            PokemonHeaderRow(
+                language = SupportedLanguage.ENGLISH,
+                pokemon = emptyPokemon,
+                progress = emptyResearch,
+                pokeSort = PokeSort.HISUI,
+                isExpanded = false,
+                onClick = {})
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(text = stringResource(R.string.search_fail_message), color = TextSecondary, style = Typography.body1)
     }
 }
 
@@ -545,37 +654,28 @@ fun ArcedexBottomBar(
     inSearchMode: Boolean, searchText: String, onSearch: (String) -> Unit,
     searchClear: () -> Unit
 ) {
-    BottomAppBar {
-        if (!inSearchMode) {
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 4.dp)
-            ) {
+    Surface(color = Surface, elevation = 8.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (!inSearchMode) {
                 Text(
                     formatSearchedText(language, searchText),
-                    color = MaterialTheme.colors.onPrimary,
-                    modifier = Modifier
-                        .background(MaterialTheme.colors.primary)
-                        .padding(all = 4.dp)
+                    color = TextPrimary,
+                    style = Typography.body2,
+                    modifier = Modifier.weight(1f)
                 )
-            }
-            Card(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .border(1.dp, Color.White)
-                    .clickable { searchClear() }
-            ) {
-                Text(
-                    stringResource(R.string.clear_label),
-                    color = MaterialTheme.colors.onPrimary,
-                    modifier = Modifier
-                        .background(MaterialTheme.colors.primary)
-                        .padding(all = 4.dp)
+                PillButton(
+                    text = stringResource(R.string.clear_label),
+                    selected = false,
+                    onClick = { searchClear() }
                 )
+            } else {
+                SearchInputText(onSearch)
             }
-        } else {
-            SearchInputText(onSearch)
         }
     }
 }
@@ -593,11 +693,14 @@ fun RowScope.SearchInputText(
         value = text,
         onValueChange = { text = it },
         colors = TextFieldDefaults.textFieldColors(
-            backgroundColor = MaterialTheme.colors.background,
-            textColor = MaterialTheme.colors.onBackground,
-            placeholderColor = MaterialTheme.colors.onBackground,
-            focusedLabelColor = MaterialTheme.colors.onBackground,
-            cursorColor = MaterialTheme.colors.onBackground
+            backgroundColor = SurfaceElevated,
+            textColor = TextPrimary,
+            placeholderColor = TextSecondary,
+            focusedLabelColor = AccentRed,
+            unfocusedLabelColor = TextSecondary,
+            cursorColor = AccentRed,
+            focusedIndicatorColor = AccentRed,
+            unfocusedIndicatorColor = SurfaceBorder
         ),
         maxLines = 1,
         keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
@@ -605,25 +708,17 @@ fun RowScope.SearchInputText(
             onDone(text)
             keyboardController?.hide()
         }),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier
-            .border(4.dp, MaterialTheme.colors.primary)
-            .weight(1f),
+            .weight(1f)
+            .padding(end = 8.dp),
         label = { Text(stringResource(R.string.search_label)) }
     )
-    Card(
-        modifier = Modifier
-            .padding(horizontal = 4.dp)
-            .border(1.dp, Color.White)
-            .clickable { onDone(text) }
-    ) {
-        Text(
-            stringResource(R.string.done_label),
-            color = MaterialTheme.colors.onPrimary,
-            modifier = Modifier
-                .background(MaterialTheme.colors.primary)
-                .padding(all = 4.dp)
-        )
-    }
+    PillButton(
+        text = stringResource(R.string.done_label),
+        selected = true,
+        onClick = { onDone(text) }
+    )
 }
 
 //Temporary screen when ViewModel data is not ready to display yet. Probably replace with splash
@@ -631,25 +726,30 @@ fun RowScope.SearchInputText(
 @Composable
 fun InitializationScreen() {
     Column(
-        Modifier
-            .padding(8.dp)
-            .background(MaterialTheme.colors.background)
-            .fillMaxSize(1f)) {
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Background)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
         PokemonImage(
-            imgId = R.drawable.sprite79, size = 200,
+            imgId = R.drawable.sprite79, size = 180,
             desc = stringResource(id = R.string.waiting_pic_desc),
-            color = MaterialTheme.colors.background,
-            alpha = 1f
+            color = Background,
+            alpha = 0.9f
         )
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             stringResource(R.string.init_message1),
-            style = Typography.h5,
-            color = MaterialTheme.colors.onBackground
+            style = Typography.h6,
+            color = TextPrimary
         )
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             stringResource(R.string.init_message2),
-            style = Typography.h6,
-            color = MaterialTheme.colors.onBackground
+            style = Typography.body1,
+            color = TextSecondary
         )
     }
 }

@@ -73,6 +73,15 @@ fun getPointsToNextRankText(lang: SupportedLanguage, points: Int): String {
     return translate(lang, "Points to next rank:") + " " + pointsNeeded
 }
 
+//Sum of every task's max points across every Pokemon, plus the 100pt completion bonus per
+//Pokemon, gives the theoretical max total research points (currently 125,100).
+fun getTotalPointsPossible(): Int {
+    return PokeResearchData.tasks
+        .groupBy { it.name }
+        .values
+        .sumOf { tasksForPokemon -> tasksForPokemon.sumOf { it.points * it.totalGoals } + 100 }
+}
+
 fun getRankProgress(points: Float): Float {
     val ranks = PokeResearchData.ranks
     return when {

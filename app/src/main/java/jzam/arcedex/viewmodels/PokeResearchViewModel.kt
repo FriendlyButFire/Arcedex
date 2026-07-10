@@ -49,6 +49,10 @@ class PokeResearchViewModel(
     var pokemonToResearchTasks: LiveData<Map<String, MutableList<PokeResearch>>> =
         _pokemonToResearchTasks
 
+    //Whether completed Pokemon and completed tasks should be hidden from view
+    private val _hideCompleted: MutableLiveData<Boolean> = MutableLiveData(false)
+    var hideCompleted: LiveData<Boolean> = _hideCompleted
+
     private var language = SupportedLanguage.ENGLISH
 
     //Set initial values on ViewModel initialization
@@ -206,6 +210,11 @@ class PokeResearchViewModel(
 
     fun setLanguage(lang: SupportedLanguage) {
         language = lang
+    }
+
+    //Flip the hide-completed filter on/off
+    fun toggleHideCompleted() {
+        _hideCompleted.value = !(_hideCompleted.value ?: false)
     }
 }
 

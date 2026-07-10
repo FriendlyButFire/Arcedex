@@ -2,19 +2,21 @@ package jzam.arcedex.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple200 = Color(0xFFBB86FC)
-val Purple500 = Color(0xFF6200EE)
-val Purple700 = Color(0xFF3700B3)
-val Teal200 = Color(0xFF03DAC5)
-val NavyBlue = Color(0xFF003366)
-val Brown = Color(0xFF663300)
-val Cream = Color(0xFFFFFDD0)
-val Linen = Color(0xFFFAF0E6)
-val AntiqueWhite = Color(0xFFFAEBD7)
-val Burgundy = Color(0xFF800020)
-val DarkBurgundy = Color(0xFF400010)
-val PokeRed = Color(0xFFEE1515)
-val YellowGreen = Color(0xFF3E5214)
-val DarkGray = Color(0xFF121212)
-val DarkYellow = Color(0xFF8B8000)
-val DarkNavyBlue = Color(0xFF0B0B45)
+// --- Modern dark palette ---
+val Background = Color(0xFF0F1115)      // near-black app background
+val Surface = Color(0xFF1A1D23)         // card / row surface
+val SurfaceElevated = Color(0xFF23262E) // expanded / active surface
+val SurfaceBorder = Color(0xFF2E323C)   // subtle hairline borders
+
+val AccentRed = Color(0xFFFF5A5F)       // primary accent, modern Pokedex red
+val AccentRedMuted = Color(0xFF3A1E20)  // accent tint for subtle fills
+val AccentBlue = Color(0xFF4CC9F0)      // secondary accent
+val AccentGreen = Color(0xFF06D6A0)     // success / completed
+
+val TextPrimary = Color(0xFFF5F5F7)
+val TextSecondary = Color(0xFF9BA1AC)
+val TextDisabled = Color(0xFF585D68)
+
+// Legacy names kept for anything still referencing them
+val PokeRed = AccentRed
+val DarkGray = Background

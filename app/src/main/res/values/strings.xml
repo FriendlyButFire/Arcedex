@@ -4,6 +4,8 @@
     <string name="hisui_sort_label">Hisui</string>
     <string name="national_sort_label">National</string>
     <string name="alpha_sort_label">Alphabetical</string>
+    <string name="hide_completed_label">HIDE DONE</string>
+    <string name="show_completed_label">SHOW DONE</string>
     <string name="pokemon_pic_desc" translatable="false">Pokemon pic</string>
     <string name="pokeball_pic_desc" translatable="false">Pokeball pic</string>
     <string name="red_quote" translatable="false">...</string>

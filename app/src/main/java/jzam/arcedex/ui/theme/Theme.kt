@@ -1,42 +1,28 @@
 package jzam.arcedex.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.darkColors
-import androidx.compose.material.lightColors
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 
 private val DarkColorPalette = darkColors(
-    primary = DarkBurgundy,
-    primaryVariant = DarkYellow,
-    secondary = DarkNavyBlue,
-    secondaryVariant = DarkYellow,
-    background = DarkGray,
-    surface = DarkBurgundy,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onSurface = Color.White
+    primary = AccentRed,
+    primaryVariant = AccentRedMuted,
+    secondary = AccentBlue,
+    secondaryVariant = AccentGreen,
+    background = Background,
+    surface = Surface,
+    onPrimary = TextPrimary,
+    onSecondary = Background,
+    onBackground = TextPrimary,
+    onSurface = TextPrimary
 )
 
-private val LightColorPalette = lightColors(
-    primary = Burgundy,
-    primaryVariant = Color.Yellow,
-    secondary = NavyBlue,
-    secondaryVariant = NavyBlue,
-    background = Linen,
-)
-
+// Arcedex always ships a modern dark theme regardless of system setting - the app was
+// specifically redesigned around this palette.
 @Composable
-fun ArcedexTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val colors = if (darkTheme) {
-        DarkColorPalette
-    } else {
-        LightColorPalette
-    }
-
+fun ArcedexTheme(darkTheme: Boolean = true, content: @Composable () -> Unit) {
     MaterialTheme(
-        colors = colors,
+        colors = DarkColorPalette,
         typography = Typography,
         shapes = Shapes,
         content = content
