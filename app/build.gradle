@@ -1,76 +1,60 @@
 plugins {
-    id 'com.android.application'
-    id 'com.google.devtools.ksp'
-    id 'org.jetbrains.kotlin.plugin.compose'//  'kotlin-kapt'
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.compose)
 }
 kotlin {
     jvmToolchain(17)
 }
 android {
     compileSdk 37
-
     defaultConfig {
         applicationId "jzam.arcedex"
         minSdk 23
         targetSdk 37
         versionCode 1
         versionName "1.0"
-
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary true
-        }
+        vectorDrawables { useSupportLibrary true }
     }
-
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    buildFeatures {
-        compose true
-    }
-    packagingOptions {
-        resources {
-            excludes += '/META-INF/{AL2.0,LGPL2.1}'
-        }
-    }
+    buildFeatures { compose true }
+    packagingOptions { resources { excludes += '/META-INF/{AL2.0,LGPL2.1}' } }
     namespace 'jzam.arcedex'
 }
 
 dependencies {
+    implementation libs.androidx.core.ktx
+    implementation platform(libs.compose.bom)
+    implementation libs.androidx.compose.ui
+    implementation libs.androidx.compose.animation
+    implementation libs.androidx.compose.material
+    implementation libs.androidx.compose.ui.tooling.preview
+    implementation libs.androidx.compose.runtime.livedata
+    implementation libs.androidx.lifecycle.runtime.ktx
+    implementation libs.androidx.activity.compose
 
-    implementation 'androidx.core:core-ktx:1.19.0'
-    implementation platform('androidx.compose:compose-bom:2026.06.01')
-    implementation 'androidx.compose.ui:ui'
-    implementation 'androidx.compose.animation:animation'
-    implementation 'androidx.compose.material:material'
-    implementation 'androidx.compose.ui:ui-tooling-preview'
-    implementation 'androidx.compose.runtime:runtime-livedata'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.11.0'
-    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation libs.androidx.room.ktx
+    ksp libs.androidx.room.compiler
+    androidTestImplementation libs.androidx.room.testing
 
-    // Room components
-    implementation "androidx.room:room-ktx:$rootProject.roomVersion"
-    ksp "androidx.room:room-compiler:$rootProject.roomVersion"
-    androidTestImplementation "androidx.room:room-testing:$rootProject.roomVersion"
+    implementation libs.androidx.lifecycle.viewmodel.ktx
+    implementation libs.androidx.lifecycle.livedata.ktx
+    implementation libs.androidx.lifecycle.common.java8
 
-    // Lifecycle components
-    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$rootProject.lifecycleVersion"
-    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$rootProject.lifecycleVersion"
-    implementation "androidx.lifecycle:lifecycle-common-java8:$rootProject.lifecycleVersion"
+    implementation libs.kotlin.stdlib.jdk7
+    api libs.kotlinx.coroutines.core
+    api libs.kotlinx.coroutines.android
 
-    // Kotlin components
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.0"
-    api "org.jetbrains.kotlinx:kotlinx-coroutines-core:$rootProject.coroutines"
-    api "org.jetbrains.kotlinx:kotlinx-coroutines-android:$rootProject.coroutines"
-
-
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
-    androidTestImplementation platform('androidx.compose:compose-bom:2026.06.01')
-    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
-    debugImplementation 'androidx.compose.ui:ui-tooling'
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.test.ext.junit
+    androidTestImplementation libs.androidx.test.espresso.core
+    androidTestImplementation platform(libs.compose.bom)
+    androidTestImplementation libs.androidx.compose.ui.test.junit4
+    debugImplementation libs.androidx.compose.ui.tooling
 }
