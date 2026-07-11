@@ -17,7 +17,7 @@ Those were the main features I wanted, but I also planned and implemented other 
 ## App Screenshots
 Example Screenshot 1:
 
-<img src="https://user-images.githubusercontent.com/14002654/162358041-6c4e510b-899e-4901-ad35-3a21188d32fd.jpg" width="250">
+<img src="https://user-images.githubusercontent.com/14002654/162358041-6c4e510b-899e-4901-ad35-3a21188d32fd.jpg" width="250" alt="">
 
 Example Screenshot 2:
 

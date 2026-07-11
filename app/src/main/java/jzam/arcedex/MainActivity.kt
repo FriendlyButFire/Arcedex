@@ -6,10 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,9 +16,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -31,11 +28,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jzam.arcedex.models.*
 import jzam.arcedex.ui.theme.*
 import jzam.arcedex.utils.*
@@ -93,7 +90,7 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
         InitializationScreen()
     } else {
         Scaffold(
-            backgroundColor = Background,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 ArcedexTopBar(
                     language = language,
@@ -116,7 +113,7 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
             Box(
                 modifier = Modifier
                     .padding(innerPadding)
-                    .background(Background)
+                    .background(MaterialTheme.colorScheme.background)
             ) {
                 val displayedPokedex = if (hideCompleted) {
                     pokedex.filter { pokemon ->
@@ -142,13 +139,13 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
     }
 }
 
-//App's top bar - Shows app name, research rank progress, and Sort/Hide-completed buttons
+//App's top bar - Shows app name, research rank progress, and Sort/Hide-completed chips
 @Composable
 fun ArcedexTopBar(
     language: SupportedLanguage, userPoints: Int, hideCompleted: Boolean,
     onSortChosen: (PokeSort) -> Unit, onHideCompletedToggled: () -> Unit
 ) {
-    Surface(color = Surface, elevation = 4.dp) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 4.dp) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -158,8 +155,8 @@ fun ArcedexTopBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.app_name),
-                    style = Typography.h6,
-                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
                 ResearchRankInfo(language, userPoints)
@@ -174,13 +171,30 @@ fun ArcedexTopBar(
     }
 }
 
-//Toggle button to show/hide Pokemon and tasks that are already fully completed
+//Toggle chip to show/hide Pokemon and tasks that are already fully completed - a filter chip is
+//the idiomatic M3 fit here since it has a built-in "selected" concept.
 @Composable
 fun HideCompletedButton(hideCompleted: Boolean, onToggle: () -> Unit) {
-    PillButton(
-        text = stringResource(if (hideCompleted) R.string.show_completed_label else R.string.hide_completed_label),
+    FilterChip(
         selected = hideCompleted,
-        onClick = onToggle
+        onClick = onToggle,
+        label = {
+            Text(
+                stringResource(if (hideCompleted) R.string.show_completed_label else R.string.hide_completed_label),
+                style = MaterialTheme.typography.labelLarge
+            )
+        },
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            labelColor = MaterialTheme.colorScheme.onSurface,
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+        ),
+        border = if (hideCompleted) null else FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = false,
+            borderColor = MaterialTheme.colorScheme.outline
+        )
     )
 }
 
@@ -193,74 +207,67 @@ fun ResearchRankInfo(language: SupportedLanguage, userPoints: Int) {
     val totalPointsPossible = getTotalPointsPossible()
 
     Column(horizontalAlignment = Alignment.End) {
-        Text(researchRank, style = Typography.button, color = AccentRed)
+        Text(researchRank, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         LinearProgressIndicator(
-            progress = barProgress,
-            color = AccentRed,
-            backgroundColor = SurfaceBorder,
+            progress = { barProgress },
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.outline,
             modifier = Modifier
                 .width(120.dp)
                 .padding(vertical = 6.dp)
                 .clip(RoundedCornerShape(50))
         )
-        Text(pointsToNext, style = Typography.caption, color = TextSecondary)
-        Text("$userPoints / $totalPointsPossible", style = Typography.caption, color = TextSecondary)
+        Text(pointsToNext, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "$userPoints / $totalPointsPossible",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
-//Button to set how the Pokemon list is sorted
+//Chip to open the sort menu - an assist chip since it triggers an action/menu rather than
+//toggling a persistent state.
 @Composable
 fun SortButton(onSortChosen: (PokeSort) -> Unit) {
     var sortExpanded by remember { mutableStateOf(false) }
 
     Box {
-        PillButton(
-            text = stringResource(R.string.sort_label),
-            selected = false,
-            onClick = { sortExpanded = true }
+        AssistChip(
+            onClick = { sortExpanded = true },
+            label = { Text(stringResource(R.string.sort_label), style = MaterialTheme.typography.labelLarge) },
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                labelColor = MaterialTheme.colorScheme.onSurface
+            ),
+            border = AssistChipDefaults.assistChipBorder(
+                enabled = true,
+                borderColor = MaterialTheme.colorScheme.outline
+            )
         )
         DropdownMenu(
             expanded = sortExpanded,
-            onDismissRequest = { sortExpanded = false },
-            modifier = Modifier.background(SurfaceElevated)
+            onDismissRequest = { sortExpanded = false }
         ) {
-            DropdownMenuItem(onClick = {
-                onSortChosen(PokeSort.HISUI)
-                sortExpanded = false
-            }) {
-                Text(stringResource(R.string.hisui_sort_label), color = TextPrimary)
-            }
-            DropdownMenuItem(onClick = {
-                onSortChosen(PokeSort.ALPHABETICAL)
-                sortExpanded = false
-            }) {
-                Text(stringResource(R.string.alpha_sort_label), color = TextPrimary)
-            }
-            DropdownMenuItem(onClick = {
-                onSortChosen(PokeSort.NATIONAL)
-                sortExpanded = false
-            }) {
-                Text(stringResource(R.string.national_sort_label), color = TextPrimary)
-            }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.hisui_sort_label)) },
+                onClick = {
+                    onSortChosen(PokeSort.HISUI)
+                    sortExpanded = false
+                })
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.alpha_sort_label)) },
+                onClick = {
+                    onSortChosen(PokeSort.ALPHABETICAL)
+                    sortExpanded = false
+                })
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.national_sort_label)) },
+                onClick = {
+                    onSortChosen(PokeSort.NATIONAL)
+                    sortExpanded = false
+                })
         }
-    }
-}
-
-//Small reusable pill-shaped button used across the top bar and bottom bar
-@Composable
-fun PillButton(text: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        shape = PillShape,
-        color = if (selected) AccentRed else SurfaceElevated,
-        border = if (selected) null else BorderStroke(1.dp, SurfaceBorder),
-        modifier = Modifier.clickable { onClick() }
-    ) {
-        Text(
-            text,
-            style = Typography.button,
-            color = if (selected) Background else TextPrimary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
     }
 }
 
@@ -327,8 +334,10 @@ fun PokedexPokemon(
 
     Card(
         shape = RoundedCornerShape(16.dp),
-        backgroundColor = if (isExpanded) SurfaceElevated else Surface,
-        elevation = if (isExpanded) 6.dp else 1.dp,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isExpanded) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isExpanded) 6.dp else 1.dp),
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
@@ -342,13 +351,13 @@ fun PokedexPokemon(
                 isExpanded = isExpanded,
                 onClick = { isExpanded = !isExpanded })
             if (isExpanded) {
-                Divider(color = SurfaceBorder, thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
                 if (visibleTasks != null) {
                     if (visibleTasks.isEmpty()) {
                         Text(
                             stringResource(R.string.search_fail_message),
-                            color = TextSecondary,
-                            style = Typography.body2,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(16.dp)
                         )
                     } else {
@@ -397,7 +406,7 @@ fun PokemonHeaderRow(
             ProgressPokeballImage(pokeProgress)
             Text(
                 "\u25BE",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 18.sp,
                 modifier = Modifier
                     .padding(start = 8.dp)
@@ -414,7 +423,7 @@ fun PokemonAvatar(imgId: Int, alpha: Float) {
         modifier = Modifier
             .size(52.dp)
             .clip(CircleShape)
-            .background(SurfaceElevated),
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         Image(
@@ -460,20 +469,20 @@ fun PokemonProgress(
                 else -> ""
             }
             if (idText.isNotBlank()) {
-                Text(idText, color = TextSecondary, style = Typography.body2)
+                Text(idText, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.width(6.dp))
             }
             Text(
                 translate(language, pokemon.name),
-                color = TextPrimary,
-                style = Typography.subtitle1
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
         LinearProgressIndicator(
-            progress = fraction,
-            color = if (complete) AccentGreen else AccentRed,
-            backgroundColor = SurfaceBorder,
+            progress = { fraction },
+            color = if (complete) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.outline,
             modifier = Modifier
                 .fillMaxWidth(0.85f)
                 .height(5.dp)
@@ -488,8 +497,8 @@ fun PokemonProgress(
                 pointsDone = pokeProgress.pointsDone + pokeProgress.bonusEarned,
                 pointsTotal = pokeProgress.pointsTotal
             ),
-            color = TextSecondary,
-            style = Typography.caption
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium
         )
     }
 }
@@ -506,7 +515,7 @@ fun ProgressPokeballImage(pokeProgress: ResearchProgress) {
         PokemonImage(
             imgId = pokeballImg, size = 32,
             desc = stringResource(R.string.pokeball_pic_desc),
-            color = Background,
+            color = Color.Unspecified,
             alpha = 1f
         )
     }
@@ -540,21 +549,22 @@ fun TaskRow(
 //Points icon. 20 = double points, 10 = standard points
 @Composable
 fun PointsIcon(points: Int) {
-    val color = if (points == 20) AccentRed else TextSecondary
+    val color = if (points == 20) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     PokemonImage(
         imgId = R.drawable.double_points, size = 22,
         desc = stringResource(id = R.string.points_icon_desc), color = color, alpha = 1f
     )
 }
 
-//Task description that will show move type if it's for a Pokemon move
+//Task description that will show move type if it's for a Pokemon move, using an assist chip
+//since tapping it triggers a search action.
 @Composable
 fun RowScope.TaskText(language: SupportedLanguage, task: String, onMoveClick: (String) -> Unit) {
     Column(modifier = Modifier.weight(1f)) {
         Text(
             translate(language, task),
-            color = TextPrimary,
-            style = Typography.body2,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 8.dp)
         )
 
@@ -563,25 +573,23 @@ fun RowScope.TaskText(language: SupportedLanguage, task: String, onMoveClick: (S
         val translatedType = translate(language, type)
         if (type.isNotBlank()) {
             val bgColor = getTypeColor(type)
-            Surface(
-                shape = PillShape,
-                color = bgColor,
-                modifier = Modifier
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .clickable { onMoveClick(("$translatedType$typeText")) }
-            ) {
-                Text(
-                    text = translate(language, type),
-                    color = Color.White,
-                    style = Typography.caption,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                )
-            }
+            AssistChip(
+                onClick = { onMoveClick(("$translatedType$typeText")) },
+                label = { Text(translate(language, type), style = MaterialTheme.typography.labelMedium) },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = bgColor,
+                    labelColor = Color.White
+                ),
+                border = null,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
         }
     }
 }
 
-//Goal description that can clicked to modify goal progress for a research task
+//Goal description that can clicked to modify goal progress for a research task. Kept as a
+//custom compact Surface rather than a FilterChip - M3's chip padding/min-touch-target is too
+//large to fit 5 of these in a row alongside the task text.
 @Composable
 fun GoalText(
     language: SupportedLanguage,
@@ -592,16 +600,19 @@ fun GoalText(
         val reached = pokemonTask.goalProgress >= goalNum
         Surface(
             shape = CircleShape,
-            color = if (reached) AccentGreen else SurfaceElevated,
-            border = if (reached) null else BorderStroke(1.dp, SurfaceBorder),
+            color = if (reached) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant,
+            border = if (reached) null else androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outline
+            ),
             modifier = Modifier
                 .padding(horizontal = 2.dp)
                 .clickable { onGoalClick(pokemonTask, goalNum) }
         ) {
             Text(
                 translate(lang = language, text = goal),
-                color = if (reached) Background else TextSecondary,
-                style = Typography.caption,
+                color = if (reached) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
@@ -624,12 +635,12 @@ fun ShowEmptySearch() {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Background)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         Card(
             shape = RoundedCornerShape(16.dp),
-            backgroundColor = Surface,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier.fillMaxWidth()
         ) {
             PokemonHeaderRow(
@@ -641,7 +652,11 @@ fun ShowEmptySearch() {
                 onClick = {})
         }
         Spacer(modifier = Modifier.height(24.dp))
-        Text(text = stringResource(R.string.search_fail_message), color = TextSecondary, style = Typography.body1)
+        Text(
+            text = stringResource(R.string.search_fail_message),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyLarge
+        )
     }
 }
 
@@ -652,7 +667,7 @@ fun ArcedexBottomBar(
     inSearchMode: Boolean, searchText: String, onSearch: (String) -> Unit,
     searchClear: () -> Unit
 ) {
-    Surface(color = Surface, elevation = 8.dp) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 8.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -663,15 +678,17 @@ fun ArcedexBottomBar(
             if (!inSearchMode) {
                 Text(
                     formatSearchedText(language, searchText),
-                    color = TextPrimary,
-                    style = Typography.body2,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f)
                 )
-                PillButton(
-                    text = stringResource(R.string.clear_label),
-                    selected = false,
-                    onClick = { searchClear() }
-                )
+                OutlinedButton(
+                    onClick = { searchClear() },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Text(stringResource(R.string.clear_label), style = MaterialTheme.typography.labelLarge)
+                }
             } else {
                 SearchInputText(onSearch)
             }
@@ -691,15 +708,16 @@ fun RowScope.SearchInputText(
     TextField(
         value = text,
         onValueChange = { text = it },
-        colors = TextFieldDefaults.textFieldColors(
-            backgroundColor = SurfaceElevated,
-            textColor = TextPrimary,
-            placeholderColor = TextSecondary,
-            focusedLabelColor = AccentRed,
-            unfocusedLabelColor = TextSecondary,
-            cursorColor = AccentRed,
-            focusedIndicatorColor = AccentRed,
-            unfocusedIndicatorColor = SurfaceBorder
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+            unfocusedIndicatorColor = MaterialTheme.colorScheme.outline
         ),
         maxLines = 1,
         keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
@@ -713,11 +731,15 @@ fun RowScope.SearchInputText(
             .padding(end = 8.dp),
         label = { Text(stringResource(R.string.search_label)) }
     )
-    PillButton(
-        text = stringResource(R.string.done_label),
-        selected = true,
-        onClick = { onDone(text) }
-    )
+    Button(
+        onClick = { onDone(text) },
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    ) {
+        Text(stringResource(R.string.done_label), style = MaterialTheme.typography.labelLarge)
+    }
 }
 
 //Temporary screen when ViewModel data is not ready to display yet. Probably replace with splash
@@ -727,7 +749,7 @@ fun InitializationScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -735,20 +757,20 @@ fun InitializationScreen() {
         PokemonImage(
             imgId = R.drawable.sprite79, size = 180,
             desc = stringResource(id = R.string.waiting_pic_desc),
-            color = Background,
+            color = Color.Unspecified,
             alpha = 0.9f
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             stringResource(R.string.init_message1),
-            style = Typography.h6,
-            color = TextPrimary
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             stringResource(R.string.init_message2),
-            style = Typography.body1,
-            color = TextSecondary
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

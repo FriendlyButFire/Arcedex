@@ -8,7 +8,6 @@
     <string name="show_completed_label">SHOW DONE</string>
     <string name="pokemon_pic_desc" translatable="false">Pokemon pic</string>
     <string name="pokeball_pic_desc" translatable="false">Pokeball pic</string>
-    <string name="red_quote" translatable="false">...</string>
     <string name="search_fail_message">Nothing to see here. Clear search and try again.</string>
     <string name="points_icon_desc" translatable="false">Points icon</string>
     <string name="clear_label">CLEAR</string>
