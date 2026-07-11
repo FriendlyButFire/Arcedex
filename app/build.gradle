@@ -7,36 +7,36 @@ kotlin {
     jvmToolchain(17)
 }
 android {
-    compileSdk 37
+    compileSdk = 37
 
     defaultConfig {
-        applicationId "jzam.arcedex"
-        minSdk 23
-        targetSdk 37
-        versionCode 1
-        versionName "1.0"
+        applicationId = "jzam.arcedex"
+        minSdk = 23
+        targetSdk = 37
+        versionCode = 1
+        versionName = "1.0"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
-            useSupportLibrary true
+            useSupportLibrary = true
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled = false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     buildFeatures {
-        compose true
+        compose = true
     }
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
     }
-    namespace 'jzam.arcedex'
+    namespace = 'jzam.arcedex'
 }
 
 dependencies {
