@@ -20,7 +20,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -71,28 +71,25 @@ class MainActivity : ComponentActivity() {
 //and passes them along to the child composables that need them
 @Composable
 fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
-    val researchTasks by pokeResearchViewModel.researchTasks.observeAsState()
-    val pokedex by pokeResearchViewModel.pokedex.observeAsState()
-    val researchProgress by pokeResearchViewModel.researchProgress.observeAsState()
-    val pokeSort by pokeResearchViewModel.pokesort.observeAsState()
-    val inSearchMode by pokeResearchViewModel.inSearchMode.observeAsState()
-    val searchedText by pokeResearchViewModel.searchedText.observeAsState()
-    val userPoints by pokeResearchViewModel.userPoints.observeAsState()
-    val pokemonToResearchTasks by pokeResearchViewModel.pokemonToResearchTasks.observeAsState()
-    val hideCompleted by pokeResearchViewModel.hideCompleted.observeAsState(false)
+    val researchTasks by pokeResearchViewModel.researchTasks.collectAsStateWithLifecycle()
+    val pokedex by pokeResearchViewModel.pokedex.collectAsStateWithLifecycle()
+    val researchProgress by pokeResearchViewModel.researchProgress.collectAsStateWithLifecycle()
+    val pokeSort by pokeResearchViewModel.pokesort.collectAsStateWithLifecycle()
+    val inSearchMode by pokeResearchViewModel.inSearchMode.collectAsStateWithLifecycle()
+    val searchedText by pokeResearchViewModel.searchedText.collectAsStateWithLifecycle()
+    val userPoints by pokeResearchViewModel.userPoints.collectAsStateWithLifecycle()
+    val pokemonToResearchTasks by pokeResearchViewModel.pokemonToResearchTasks.collectAsStateWithLifecycle()
+    val hideCompleted by pokeResearchViewModel.hideCompleted.collectAsStateWithLifecycle()
     val language = getSupportedLanguage(LocaleList.current)
 
     pokeResearchViewModel.setLanguage(language)
 
-    //Recalculate progress on recomposition, need to make sure research tasks has been fetched
-    //before running or this will fail
-    if (researchTasks != null) {
-        pokeResearchViewModel.calcProgress()
-    }
+    //Recalculate progress on recomposition, based on the latest tasks collected from the DB
+    pokeResearchViewModel.calcProgress()
 
     //Show the main app screen or the initialization screen if we are still waiting on the view
     //model to retrieve all tasks from the repository
-    if (researchTasks == null || researchTasks!!.size < 242) {
+    if (researchTasks.size < 242) {
         InitializationScreen()
     } else {
         Scaffold(
@@ -100,7 +97,7 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
             topBar = {
                 ArcedexTopBar(
                     language = language,
-                    userPoints = userPoints!!,
+                    userPoints = userPoints,
                     hideCompleted = hideCompleted,
                     onSortChosen = pokeResearchViewModel::setSort,
                     onHideCompletedToggled = pokeResearchViewModel::toggleHideCompleted
@@ -109,8 +106,8 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
             bottomBar = {
                 ArcedexBottomBar(
                     language = language,
-                    inSearchMode = inSearchMode!!,
-                    searchText = searchedText!!,
+                    inSearchMode = inSearchMode,
+                    searchText = searchedText,
                     onSearch = pokeResearchViewModel::searchPokedex,
                     searchClear = pokeResearchViewModel::searchClear
                 )
@@ -122,19 +119,19 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                     .background(Background)
             ) {
                 val displayedPokedex = if (hideCompleted) {
-                    pokedex!!.filter { pokemon ->
-                        val prog = researchProgress!!.find { it.name == pokemon.name }
+                    pokedex.filter { pokemon ->
+                        val prog = researchProgress.find { it.name == pokemon.name }
                         //Keep Pokemon with no progress entry (not yet started) or not fully done
                         prog == null || (prog.pointsDone + prog.bonusEarned) < prog.pointsTotal
                     }
                 } else {
-                    pokedex!!
+                    pokedex
                 }
                 Pokedex(
                     language = language,
                     pokedex = displayedPokedex,
-                    progress = researchProgress!!,
-                    pokeSort = pokeSort!!,
+                    progress = researchProgress,
+                    pokeSort = pokeSort,
                     onGoalClick = pokeResearchViewModel::onGoalClick,
                     pokemonToResearchTasks = pokemonToResearchTasks,
                     onMoveClick = pokeResearchViewModel::searchPokedex,

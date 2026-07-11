@@ -8,48 +8,63 @@ kotlin {
 }
 android {
     compileSdk 37
+
     defaultConfig {
         applicationId "jzam.arcedex"
         minSdk 23
         targetSdk 37
         versionCode 1
         versionName "1.0"
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables { useSupportLibrary true }
+        vectorDrawables {
+            useSupportLibrary true
+        }
     }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    buildFeatures { compose true }
-    packagingOptions { resources { excludes += '/META-INF/{AL2.0,LGPL2.1}' } }
+    buildFeatures {
+        compose true
+    }
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
     namespace 'jzam.arcedex'
 }
 
 dependencies {
+
     implementation libs.androidx.core.ktx
     implementation platform(libs.compose.bom)
     implementation libs.androidx.compose.ui
     implementation libs.androidx.compose.animation
     implementation libs.androidx.compose.material
     implementation libs.androidx.compose.ui.tooling.preview
-    implementation libs.androidx.compose.runtime.livedata
     implementation libs.androidx.lifecycle.runtime.ktx
+    implementation libs.androidx.lifecycle.runtime.compose
     implementation libs.androidx.activity.compose
 
+    // Room components
     implementation libs.androidx.room.ktx
     ksp libs.androidx.room.compiler
     androidTestImplementation libs.androidx.room.testing
 
+    // Lifecycle components
     implementation libs.androidx.lifecycle.viewmodel.ktx
-    implementation libs.androidx.lifecycle.livedata.ktx
     implementation libs.androidx.lifecycle.common.java8
 
+    // Kotlin components
     implementation libs.kotlin.stdlib.jdk7
     api libs.kotlinx.coroutines.core
     api libs.kotlinx.coroutines.android
+
 
     testImplementation libs.junit
     androidTestImplementation libs.androidx.test.ext.junit

@@ -1,10 +1,17 @@
 package jzam.arcedex.viewmodels
 
-import androidx.lifecycle.*
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import jzam.arcedex.data.PokeResearchRepository
 import jzam.arcedex.data.Pokedex
 import jzam.arcedex.models.*
 import jzam.arcedex.utils.translate
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /*
@@ -14,55 +21,52 @@ class PokeResearchViewModel(
     private val repository: PokeResearchRepository
 ) : ViewModel() {
 
-    //List of all Pokemon research tasks
-    private val _researchTasks: MutableLiveData<List<PokeResearch>> = MutableLiveData(listOf())
-    var researchTasks: LiveData<List<PokeResearch>> = _researchTasks
+    //List of all Pokemon research tasks - collected live from the Room database as a StateFlow,
+    //so it updates automatically whenever the underlying table changes.
+    val researchTasks: StateFlow<List<PokeResearch>> = repository.getResearchTasks()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
 
     //List of all Pokemon
-    private val _pokedex: MutableLiveData<List<Pokemon>> = MutableLiveData((listOf()))
-    var pokedex: LiveData<List<Pokemon>> = _pokedex
+    private val _pokedex: MutableStateFlow<List<Pokemon>> =
+        MutableStateFlow(Pokedex.pokedex.sortedBy { it.hisuiId })
+    val pokedex: StateFlow<List<Pokemon>> = _pokedex.asStateFlow()
 
     //List of objects that track how much research progress has been completed for each Pokemon
-    private val _researchProgress: MutableLiveData<List<ResearchProgress>> =
-        MutableLiveData(listOf())
-    var researchProgress: LiveData<List<ResearchProgress>> = _researchProgress
+    private val _researchProgress: MutableStateFlow<List<ResearchProgress>> =
+        MutableStateFlow(emptyList())
+    val researchProgress: StateFlow<List<ResearchProgress>> = _researchProgress.asStateFlow()
 
     //The current sort of this screen
-    private val _pokesort: MutableLiveData<PokeSort> = MutableLiveData()
-    val pokesort: LiveData<PokeSort> = _pokesort
+    private val _pokesort: MutableStateFlow<PokeSort> = MutableStateFlow(PokeSort.HISUI)
+    val pokesort: StateFlow<PokeSort> = _pokesort.asStateFlow()
 
     //Is the search box ready to receive input?
-    private val _inSearchMode: MutableLiveData<Boolean> = MutableLiveData(false)
-    var inSearchMode: LiveData<Boolean> = _inSearchMode
+    private val _inSearchMode: MutableStateFlow<Boolean> = MutableStateFlow(true)
+    val inSearchMode: StateFlow<Boolean> = _inSearchMode.asStateFlow()
 
     //The text that has been searched for
-    private val _searchedText: MutableLiveData<String> = MutableLiveData()
-    var searchedText: LiveData<String> = _searchedText
+    private val _searchedText: MutableStateFlow<String> = MutableStateFlow("")
+    val searchedText: StateFlow<String> = _searchedText.asStateFlow()
 
     //Sum of all research points to calculate the user's research rank
-    private val _userPoints: MutableLiveData<Int> = MutableLiveData()
-    var userPoints: LiveData<Int> = _userPoints
+    private val _userPoints: MutableStateFlow<Int> = MutableStateFlow(0)
+    val userPoints: StateFlow<Int> = _userPoints.asStateFlow()
 
     //Map of a Pokemon name to the list of research tasks associated to it for quicker processing
-    private val _pokemonToResearchTasks: MutableLiveData<Map<String, MutableList<PokeResearch>>> =
-        MutableLiveData()
-    var pokemonToResearchTasks: LiveData<Map<String, MutableList<PokeResearch>>> =
-        _pokemonToResearchTasks
+    private val _pokemonToResearchTasks: MutableStateFlow<Map<String, MutableList<PokeResearch>>> =
+        MutableStateFlow(emptyMap())
+    val pokemonToResearchTasks: StateFlow<Map<String, MutableList<PokeResearch>>> =
+        _pokemonToResearchTasks.asStateFlow()
 
     //Whether completed Pokemon and completed tasks should be hidden from view
-    private val _hideCompleted: MutableLiveData<Boolean> = MutableLiveData(false)
-    var hideCompleted: LiveData<Boolean> = _hideCompleted
+    private val _hideCompleted: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    val hideCompleted: StateFlow<Boolean> = _hideCompleted.asStateFlow()
 
     private var language = SupportedLanguage.ENGLISH
-
-    //Set initial values on ViewModel initialization
-    init {
-        researchTasks = repository.getResearchTasks()
-        _pokesort.value = PokeSort.HISUI
-        _pokedex.value = Pokedex.pokedex.sortedBy { it.hisuiId }
-        _searchedText.value = ""
-        _inSearchMode.value = true
-    }
 
     //Calculates research progress for each Pokemon and builds map of Pokemon name to their research
     //tasks.
@@ -74,42 +78,40 @@ class PokeResearchViewModel(
             mutableMapOf()
         val nameToProgListIdx: MutableMap<String, Int> = mutableMapOf()
         val taskList = researchTasks.value
-        if (taskList != null) {
-            for (task in taskList) {
-                if (nameToProgListIdx.containsKey(task.name)) {
-                    val tempIdx = nameToProgListIdx.getValue(task.name)
-                    progList[tempIdx].goalsDone += task.goalProgress
-                    progList[tempIdx].goalsTotal += task.totalGoals
-                    progList[tempIdx].pointsDone += task.goalProgress * task.points
-                    progList[tempIdx].pointsTotal += task.totalGoals * task.points
-                    if (progList[tempIdx].pointsDone >= 100) {
-                        progList[tempIdx].bonusEarned = 100
-                    } else {
-                        progList[tempIdx].bonusEarned = 0
-                    }
+        for (task in taskList) {
+            if (nameToProgListIdx.containsKey(task.name)) {
+                val tempIdx = nameToProgListIdx.getValue(task.name)
+                progList[tempIdx].goalsDone += task.goalProgress
+                progList[tempIdx].goalsTotal += task.totalGoals
+                progList[tempIdx].pointsDone += task.goalProgress * task.points
+                progList[tempIdx].pointsTotal += task.totalGoals * task.points
+                if (progList[tempIdx].pointsDone >= 100) {
+                    progList[tempIdx].bonusEarned = 100
                 } else {
-                    val newProgress = ResearchProgress(
-                        name = task.name,
-                        goalsDone = task.goalProgress,
-                        goalsTotal = task.totalGoals,
-                        pointsDone = task.goalProgress * task.points,
-                        //TODO - Adding bonus points here, make this a constant
-                        pointsTotal = task.totalGoals * task.points + 100
-                    )
-                    if (newProgress.pointsDone >= 100) {
-                        newProgress.bonusEarned = 100
-                    } else {
-                        newProgress.bonusEarned = 0
-                    }
-                    progList.add(idx, newProgress)
-                    nameToProgListIdx[task.name] = idx
-                    idx += 1
+                    progList[tempIdx].bonusEarned = 0
                 }
-                if (mapPokemonToResearchTasks.contains(task.name)) {
-                    mapPokemonToResearchTasks.getValue(task.name).add(task)
+            } else {
+                val newProgress = ResearchProgress(
+                    name = task.name,
+                    goalsDone = task.goalProgress,
+                    goalsTotal = task.totalGoals,
+                    pointsDone = task.goalProgress * task.points,
+                    //TODO - Adding bonus points here, make this a constant
+                    pointsTotal = task.totalGoals * task.points + 100
+                )
+                if (newProgress.pointsDone >= 100) {
+                    newProgress.bonusEarned = 100
                 } else {
-                    mapPokemonToResearchTasks[task.name] = mutableListOf(task)
+                    newProgress.bonusEarned = 0
                 }
+                progList.add(idx, newProgress)
+                nameToProgListIdx[task.name] = idx
+                idx += 1
+            }
+            if (mapPokemonToResearchTasks.contains(task.name)) {
+                mapPokemonToResearchTasks.getValue(task.name).add(task)
+            } else {
+                mapPokemonToResearchTasks[task.name] = mutableListOf(task)
             }
         }
         for (item in progList) {
@@ -126,13 +128,13 @@ class PokeResearchViewModel(
 
         when (sort) {
             PokeSort.ALPHABETICAL -> {
-                _pokedex.value = pokedex.value?.sortedBy { translate(language, it.name) }
+                _pokedex.value = pokedex.value.sortedBy { translate(language, it.name) }
             }
             PokeSort.NATIONAL -> {
-                _pokedex.value = pokedex.value?.sortedBy { it.natId }
+                _pokedex.value = pokedex.value.sortedBy { it.natId }
             }
             else -> {
-                _pokedex.value = pokedex.value?.sortedBy { it.hisuiId }
+                _pokedex.value = pokedex.value.sortedBy { it.hisuiId }
             }
         }
     }
@@ -149,21 +151,19 @@ class PokeResearchViewModel(
         var translatedName: String
         var translatedTask: String
         val findText = translate(language, searchText).lowercase()
-        if (taskList != null && oldPokedex != null) {
-            for (task in taskList) {
-                translatedName = translate(language, task.name).lowercase()
-                translatedTask = translate(language, task.task).lowercase()
-                if (!nameToListIdx.containsKey(task.name) &&
-                    (translatedName.contains(findText) ||
-                            translatedTask.contains(findText))
-                ) {
-                    for (pokemon in oldPokedex) {
-                        if (pokemon.name == task.name) {
-                            matchingPokemon.add(idx, pokemon)
-                            nameToListIdx[task.name] = idx
-                            idx += 1
-                            break
-                        }
+        for (task in taskList) {
+            translatedName = translate(language, task.name).lowercase()
+            translatedTask = translate(language, task.task).lowercase()
+            if (!nameToListIdx.containsKey(task.name) &&
+                (translatedName.contains(findText) ||
+                        translatedTask.contains(findText))
+            ) {
+                for (pokemon in oldPokedex) {
+                    if (pokemon.name == task.name) {
+                        matchingPokemon.add(idx, pokemon)
+                        nameToListIdx[task.name] = idx
+                        idx += 1
+                        break
                     }
                 }
             }
@@ -171,7 +171,7 @@ class PokeResearchViewModel(
         _pokedex.value = matchingPokemon
         _inSearchMode.value = false
         _searchedText.value = searchText
-        setSort(pokesort.value!!)
+        setSort(pokesort.value)
     }
 
     //Reset the search variables
@@ -214,7 +214,7 @@ class PokeResearchViewModel(
 
     //Flip the hide-completed filter on/off
     fun toggleHideCompleted() {
-        _hideCompleted.value = !(_hideCompleted.value ?: false)
+        _hideCompleted.value = !_hideCompleted.value
     }
 }
 

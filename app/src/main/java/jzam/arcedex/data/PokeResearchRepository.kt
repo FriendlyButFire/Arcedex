@@ -1,15 +1,15 @@
 package jzam.arcedex.data
 
 import androidx.annotation.WorkerThread
-import androidx.lifecycle.LiveData
 import jzam.arcedex.models.PokeResearch
+import kotlinx.coroutines.flow.Flow
 
 /*
  * Intermediary class for accessing PokeResearch database info.
  */
 class PokeResearchRepository(private val pokeResearchDao: PokeResearchDao) {
 
-    fun getResearchTasks(): LiveData<List<PokeResearch>> {
+    fun getResearchTasks(): Flow<List<PokeResearch>> {
         return pokeResearchDao.getResearchTasks()
     }
 

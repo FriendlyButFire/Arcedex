@@ -1,8 +1,8 @@
 package jzam.arcedex.data
 
-import androidx.lifecycle.LiveData
 import androidx.room.*
 import jzam.arcedex.models.PokeResearch
+import kotlinx.coroutines.flow.Flow
 
 /*
  * The DAO (data access object) interface for methods to access the database via SQL queries
@@ -22,7 +22,7 @@ interface PokeResearchDao {
     suspend fun deleteAll()
 
     @Query("SELECT * FROM pokeresearch_table")
-    fun getResearchTasks(): LiveData<List<PokeResearch>>
+    fun getResearchTasks(): Flow<List<PokeResearch>>
 
     @Query("SELECT COUNT(*) FROM pokeresearch_table")
     fun getCount(): Int
