@@ -6,8 +6,16 @@
     <string name="alpha_sort_label">Alphabetical</string>
     <string name="hide_completed_label">HIDE DONE</string>
     <string name="show_completed_label">SHOW DONE</string>
+    <string name="region_label">REGION</string>
+    <string name="all_regions_label">All Regions</string>
+    <string name="obsidian_fieldlands_label">Obsidian Fieldlands</string>
+    <string name="crimson_mirelands_label">Crimson Mirelands</string>
+    <string name="cobalt_coastlands_label">Cobalt Coastlands</string>
+    <string name="coronet_highlands_label">Coronet Highlands</string>
+    <string name="alabaster_icelands_label">Alabaster Icelands</string>
     <string name="pokemon_pic_desc" translatable="false">Pokemon pic</string>
     <string name="pokeball_pic_desc" translatable="false">Pokeball pic</string>
+    <string name="red_quote" translatable="false">...</string>
     <string name="search_fail_message">Nothing to see here. Clear search and try again.</string>
     <string name="points_icon_desc" translatable="false">Points icon</string>
     <string name="clear_label">CLEAR</string>

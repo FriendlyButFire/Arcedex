@@ -66,6 +66,10 @@ class PokeResearchViewModel(
     private val _hideCompleted: MutableStateFlow<Boolean> = MutableStateFlow(false)
     val hideCompleted: StateFlow<Boolean> = _hideCompleted.asStateFlow()
 
+    //Which Hisui region the Pokemon list is currently filtered to, null means no filter (all regions)
+    private val _selectedArea: MutableStateFlow<HisuiArea?> = MutableStateFlow(null)
+    val selectedArea: StateFlow<HisuiArea?> = _selectedArea.asStateFlow()
+
     private var language = SupportedLanguage.ENGLISH
 
     //Calculates research progress for each Pokemon and builds map of Pokemon name to their research
@@ -215,6 +219,11 @@ class PokeResearchViewModel(
     //Flip the hide-completed filter on/off
     fun toggleHideCompleted() {
         _hideCompleted.value = !_hideCompleted.value
+    }
+
+    //Set which Hisui region to filter the Pokemon list to, or null to clear the filter
+    fun setAreaFilter(area: HisuiArea?) {
+        _selectedArea.value = area
     }
 }
 

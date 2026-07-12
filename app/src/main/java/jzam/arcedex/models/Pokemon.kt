@@ -12,3 +12,8 @@ data class Pokemon(
 enum class PokeSort {
     NATIONAL, ALPHABETICAL, HISUI
 }
+
+//The five overworld regions of Hisui where Pokemon can be encountered in the wild
+enum class HisuiArea {
+    OBSIDIAN_FIELDLANDS, CRIMSON_MIRELANDS, COBALT_COASTLANDS, CORONET_HIGHLANDS, ALABASTER_ICELANDS
+}

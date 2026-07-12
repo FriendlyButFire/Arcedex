@@ -33,6 +33,7 @@ import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import jzam.arcedex.data.PokeAreaData
 import jzam.arcedex.models.*
 import jzam.arcedex.ui.theme.*
 import jzam.arcedex.utils.*
@@ -77,6 +78,7 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
     val userPoints by pokeResearchViewModel.userPoints.collectAsStateWithLifecycle()
     val pokemonToResearchTasks by pokeResearchViewModel.pokemonToResearchTasks.collectAsStateWithLifecycle()
     val hideCompleted by pokeResearchViewModel.hideCompleted.collectAsStateWithLifecycle()
+    val selectedArea by pokeResearchViewModel.selectedArea.collectAsStateWithLifecycle()
     val language = getSupportedLanguage(LocaleList.current)
 
     pokeResearchViewModel.setLanguage(language)
@@ -96,8 +98,10 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                     language = language,
                     userPoints = userPoints,
                     hideCompleted = hideCompleted,
+                    selectedArea = selectedArea,
                     onSortChosen = pokeResearchViewModel::setSort,
-                    onHideCompletedToggled = pokeResearchViewModel::toggleHideCompleted
+                    onHideCompletedToggled = pokeResearchViewModel::toggleHideCompleted,
+                    onAreaChosen = pokeResearchViewModel::setAreaFilter
                 )
             },
             bottomBar = {
@@ -115,15 +119,16 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                     .padding(innerPadding)
                     .background(MaterialTheme.colorScheme.background)
             ) {
-                val displayedPokedex = if (hideCompleted) {
-                    pokedex.filter { pokemon ->
+                val displayedPokedex = pokedex
+                    .filter { pokemon ->
+                        if (!hideCompleted) return@filter true
                         val prog = researchProgress.find { it.name == pokemon.name }
                         //Keep Pokemon with no progress entry (not yet started) or not fully done
                         prog == null || (prog.pointsDone + prog.bonusEarned) < prog.pointsTotal
                     }
-                } else {
-                    pokedex
-                }
+                    .filter { pokemon ->
+                        selectedArea == null || PokeAreaData.getAreas(pokemon.hisuiId).contains(selectedArea)
+                    }
                 Pokedex(
                     language = language,
                     pokedex = displayedPokedex,
@@ -142,8 +147,9 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
 //App's top bar - Shows app name, research rank progress, and Sort/Hide-completed chips
 @Composable
 fun ArcedexTopBar(
-    language: SupportedLanguage, userPoints: Int, hideCompleted: Boolean,
-    onSortChosen: (PokeSort) -> Unit, onHideCompletedToggled: () -> Unit
+    language: SupportedLanguage, userPoints: Int, hideCompleted: Boolean, selectedArea: HisuiArea?,
+    onSortChosen: (PokeSort) -> Unit, onHideCompletedToggled: () -> Unit,
+    onAreaChosen: (HisuiArea?) -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 4.dp) {
         Column(
@@ -162,10 +168,10 @@ fun ArcedexTopBar(
                 ResearchRankInfo(language, userPoints)
             }
             Spacer(modifier = Modifier.height(10.dp))
-            Row {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 HideCompletedButton(hideCompleted, onHideCompletedToggled)
-                Spacer(modifier = Modifier.width(8.dp))
                 SortButton(onSortChosen)
+                RegionButton(selectedArea, onAreaChosen)
             }
         }
     }
@@ -269,6 +275,66 @@ fun SortButton(onSortChosen: (PokeSort) -> Unit) {
                 })
         }
     }
+}
+
+//Chip to open the region filter menu - filters the Pokemon list down to only those found in the
+//selected Hisui area. Selecting the currently-selected area again, or "All Regions", clears it.
+@Composable
+fun RegionButton(selectedArea: HisuiArea?, onAreaChosen: (HisuiArea?) -> Unit) {
+    var regionExpanded by remember { mutableStateOf(false) }
+
+    Box {
+        AssistChip(
+            onClick = { regionExpanded = true },
+            label = {
+                Text(
+                    selectedArea?.let { areaDisplayName(it) } ?: stringResource(R.string.region_label),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            },
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = if (selectedArea != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                labelColor = if (selectedArea != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            ),
+            border = if (selectedArea != null) null else AssistChipDefaults.assistChipBorder(
+                enabled = true,
+                borderColor = MaterialTheme.colorScheme.outline
+            )
+        )
+        DropdownMenu(
+            expanded = regionExpanded,
+            onDismissRequest = { regionExpanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.all_regions_label)) },
+                onClick = {
+                    onAreaChosen(null)
+                    regionExpanded = false
+                })
+            for (area in HisuiArea.values()) {
+                DropdownMenuItem(
+                    text = { Text(areaDisplayName(area)) },
+                    onClick = {
+                        onAreaChosen(area)
+                        regionExpanded = false
+                    })
+            }
+        }
+    }
+}
+
+//Localized display name for a Hisui region
+@Composable
+fun areaDisplayName(area: HisuiArea): String {
+    return stringResource(
+        when (area) {
+            HisuiArea.OBSIDIAN_FIELDLANDS -> R.string.obsidian_fieldlands_label
+            HisuiArea.CRIMSON_MIRELANDS -> R.string.crimson_mirelands_label
+            HisuiArea.COBALT_COASTLANDS -> R.string.cobalt_coastlands_label
+            HisuiArea.CORONET_HIGHLANDS -> R.string.coronet_highlands_label
+            HisuiArea.ALABASTER_ICELANDS -> R.string.alabaster_icelands_label
+        }
+    )
 }
 
 //Pokedex screen - list Pokemon and click a Pokemon to expand and see their research tasks
