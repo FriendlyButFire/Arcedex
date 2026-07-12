@@ -17,3 +17,10 @@ enum class PokeSort {
 enum class HisuiArea {
     OBSIDIAN_FIELDLANDS, CRIMSON_MIRELANDS, COBALT_COASTLANDS, CORONET_HIGHLANDS, ALABASTER_ICELANDS
 }
+
+//3-state filter for the main Pokemon list, matching the same Rank10/Perfect thresholds already
+//used for the pokeball/masterball badge (see ProgressPokeballImage): Rank10 = 100+ raw points,
+//Perfect = every single research task completed.
+enum class HideFilter {
+    SHOW_ALL, HIDE_RANK10, HIDE_PERFECT
+}

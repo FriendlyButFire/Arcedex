@@ -11,6 +11,4 @@
     <string name="national_sort_label">全国</string>
     <string name="alpha_sort_label">五十音順</string>
     <string name="sort_label">ソート</string>
-    <string name="hide_completed_label">完了を隠す</string>
-    <string name="show_completed_label">完了を表示</string>
 </resources>

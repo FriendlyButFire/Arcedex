@@ -86,7 +86,7 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
     val searchedText by pokeResearchViewModel.searchedText.collectAsStateWithLifecycle()
     val userPoints by pokeResearchViewModel.userPoints.collectAsStateWithLifecycle()
     val pokemonToResearchTasks by pokeResearchViewModel.pokemonToResearchTasks.collectAsStateWithLifecycle()
-    val hideCompleted by pokeResearchViewModel.hideCompleted.collectAsStateWithLifecycle()
+    val hideFilter by pokeResearchViewModel.hideFilter.collectAsStateWithLifecycle()
     val selectedArea by pokeResearchViewModel.selectedArea.collectAsStateWithLifecycle()
     val language = getSupportedLanguage(LocaleList.current)
 
@@ -109,10 +109,10 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                 ArcedexTopBar(
                     language = language,
                     userPoints = userPoints,
-                    hideCompleted = hideCompleted,
+                    hideFilter = hideFilter,
                     selectedArea = selectedArea,
                     onSortChosen = pokeResearchViewModel::setSort,
-                    onHideCompletedToggled = pokeResearchViewModel::toggleHideCompleted,
+                    onHideFilterCycled = pokeResearchViewModel::cycleHideFilter,
                     onAreaChosen = pokeResearchViewModel::setAreaFilter,
                     onExport = pokeResearchViewModel::exportProgressBackup,
                     onImport = pokeResearchViewModel::importProgressBackup
@@ -135,10 +135,15 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
             ) {
                 val displayedPokedex = pokedex
                     .filter { pokemon ->
-                        if (!hideCompleted) return@filter true
                         val prog = researchProgress.find { it.name == pokemon.name }
-                        //Keep Pokemon with no progress entry (not yet started) or not fully done
-                        prog == null || (prog.pointsDone + prog.bonusEarned) < prog.pointsTotal
+                        when (hideFilter) {
+                            HideFilter.SHOW_ALL -> true
+                            //Rank10 = 100+ raw points, same threshold ProgressPokeballImage uses
+                            //to decide whether to show a pokeball at all
+                            HideFilter.HIDE_RANK10 -> prog == null || prog.pointsDone < 100
+                            //Perfect = every single research task completed (masterball threshold)
+                            HideFilter.HIDE_PERFECT -> prog == null || (prog.pointsDone + prog.bonusEarned) < prog.pointsTotal
+                        }
                     }
                     .filter { pokemon ->
                         selectedArea == null || PokeAreaData.getAreas(pokemon.hisuiId).contains(selectedArea)
@@ -151,18 +156,18 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                     onGoalClick = pokeResearchViewModel::onGoalClick,
                     pokemonToResearchTasks = pokemonToResearchTasks,
                     onMoveClick = pokeResearchViewModel::searchPokedex,
-                    hideCompleted = hideCompleted
+                    hideFinishedTasks = hideFilter != HideFilter.SHOW_ALL
                 )
             }
         }
     }
 }
 
-//App's top bar - Shows app name, research rank progress, and Sort/Hide-completed chips
+//App's top bar - Shows app name, research rank progress, and filter/sort chips
 @Composable
 fun ArcedexTopBar(
-    language: SupportedLanguage, userPoints: Int, hideCompleted: Boolean, selectedArea: HisuiArea?,
-    onSortChosen: (PokeSort) -> Unit, onHideCompletedToggled: () -> Unit,
+    language: SupportedLanguage, userPoints: Int, hideFilter: HideFilter, selectedArea: HisuiArea?,
+    onSortChosen: (PokeSort) -> Unit, onHideFilterCycled: () -> Unit,
     onAreaChosen: (HisuiArea?) -> Unit,
     onExport: () -> String, onImport: suspend (String) -> Int
 ) {
@@ -187,7 +192,7 @@ fun ArcedexTopBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
-                HideCompletedButton(hideCompleted, onHideCompletedToggled)
+                HideFilterButton(hideFilter, onHideFilterCycled)
                 SortButton(onSortChosen)
                 RegionButton(selectedArea, onAreaChosen)
                 BackupButton(onExport, onImport)
@@ -196,26 +201,35 @@ fun ArcedexTopBar(
     }
 }
 
-//Toggle chip to show/hide Pokemon and tasks that are already fully completed - a filter chip is
-//the idiomatic M3 fit here since it has a built-in "selected" concept.
+//3-state chip cycling SHOW_ALL -> HIDE_RANK10 -> HIDE_PERFECT -> SHOW_ALL on tap. Label always
+//names the CURRENT state (what's hidden right now), not the action the next tap will take -
+//clearer for a 3-state cycle than the old 2-state "next action" wording.
 @Composable
-fun HideCompletedButton(hideCompleted: Boolean, onToggle: () -> Unit) {
+fun HideFilterButton(hideFilter: HideFilter, onCycle: () -> Unit) {
+    val label = when (hideFilter) {
+        HideFilter.SHOW_ALL -> stringResource(R.string.filter_show_all_label)
+        HideFilter.HIDE_RANK10 -> stringResource(R.string.filter_hide_rank10_label)
+        HideFilter.HIDE_PERFECT -> stringResource(R.string.filter_hide_perfect_label)
+    }
+    val selected = hideFilter != HideFilter.SHOW_ALL
+    //Different tone per hidden state so it's visually obvious which of the two you're in, not
+    //just that "something" is filtered
+    val selectedColor = when (hideFilter) {
+        HideFilter.HIDE_PERFECT -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+
     FilterChip(
-        selected = hideCompleted,
-        onClick = onToggle,
-        label = {
-            Text(
-                stringResource(if (hideCompleted) R.string.show_completed_label else R.string.hide_completed_label),
-                style = MaterialTheme.typography.labelLarge
-            )
-        },
+        selected = selected,
+        onClick = onCycle,
+        label = { Text(label, style = MaterialTheme.typography.labelLarge) },
         colors = FilterChipDefaults.filterChipColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             labelColor = MaterialTheme.colorScheme.onSurface,
-            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedContainerColor = selectedColor,
             selectedLabelColor = MaterialTheme.colorScheme.onPrimary
         ),
-        border = if (hideCompleted) null else FilterChipDefaults.filterChipBorder(
+        border = if (selected) null else FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = false,
             borderColor = MaterialTheme.colorScheme.outline
@@ -330,7 +344,7 @@ fun RegionButton(selectedArea: HisuiArea?, onAreaChosen: (HisuiArea?) -> Unit) {
                     onAreaChosen(null)
                     regionExpanded = false
                 })
-            for (area in HisuiArea.entries) {
+            for (area in HisuiArea.values()) {
                 DropdownMenuItem(
                     text = { Text(areaDisplayName(area)) },
                     onClick = {
@@ -541,7 +555,7 @@ fun Pokedex(
     pokeSort: PokeSort, onGoalClick: (PokeResearch, Int) -> Unit,
     pokemonToResearchTasks: Map<String, MutableList<PokeResearch>>?,
     onMoveClick: (String) -> Unit,
-    hideCompleted: Boolean
+    hideFinishedTasks: Boolean
 ) {
     if (pokedex.isNotEmpty()) {
         LazyColumn(
@@ -557,7 +571,7 @@ fun Pokedex(
                     pokeSort = pokeSort,
                     onGoalClick = onGoalClick,
                     onMoveClick = onMoveClick,
-                    hideCompleted = hideCompleted
+                    hideFinishedTasks = hideFinishedTasks
                 )
             }
         }
@@ -576,7 +590,7 @@ fun PokedexPokemon(
     pokeSort: PokeSort,
     onGoalClick: (PokeResearch, Int) -> Unit,
     onMoveClick: (String) -> Unit,
-    hideCompleted: Boolean,
+    hideFinishedTasks: Boolean,
 ) {
 
     var isExpanded by remember { mutableStateOf(false) }
@@ -588,7 +602,7 @@ fun PokedexPokemon(
     }
 
     //When the filter is on, drop tasks whose goal has already been fully reached
-    val visibleTasks = if (hideCompleted) {
+    val visibleTasks = if (hideFinishedTasks) {
         tasks?.filter { it.goalProgress < it.totalGoals }
     } else {
         tasks

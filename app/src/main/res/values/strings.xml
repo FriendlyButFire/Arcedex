@@ -4,8 +4,9 @@
     <string name="hisui_sort_label">Hisui</string>
     <string name="national_sort_label">National</string>
     <string name="alpha_sort_label">Alphabetical</string>
-    <string name="hide_completed_label">HIDE DONE</string>
-    <string name="show_completed_label">SHOW DONE</string>
+    <string name="filter_show_all_label">SHOW ALL</string>
+    <string name="filter_hide_rank10_label">HIDE RANK10+</string>
+    <string name="filter_hide_perfect_label">HIDE PERFECT</string>
     <string name="region_label">REGION</string>
     <string name="all_regions_label">All Regions</string>
     <string name="obsidian_fieldlands_label">Obsidian Fieldlands</string>

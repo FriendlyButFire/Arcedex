@@ -63,8 +63,9 @@ class PokeResearchViewModel(
         _pokemonToResearchTasks.asStateFlow()
 
     //Whether completed Pokemon and completed tasks should be hidden from view
-    private val _hideCompleted: MutableStateFlow<Boolean> = MutableStateFlow(false)
-    val hideCompleted: StateFlow<Boolean> = _hideCompleted.asStateFlow()
+    //3-state filter for the main Pokemon list: show all, hide Rank10+, or hide only Perfect
+    private val _hideFilter: MutableStateFlow<HideFilter> = MutableStateFlow(HideFilter.SHOW_ALL)
+    val hideFilter: StateFlow<HideFilter> = _hideFilter.asStateFlow()
 
     //Which Hisui region the Pokemon list is currently filtered to, null means no filter (all regions)
     private val _selectedArea: MutableStateFlow<HisuiArea?> = MutableStateFlow(null)
@@ -236,8 +237,13 @@ class PokeResearchViewModel(
     }
 
     //Flip the hide-completed filter on/off
-    fun toggleHideCompleted() {
-        _hideCompleted.value = !_hideCompleted.value
+    //Cycle SHOW_ALL -> HIDE_RANK10 -> HIDE_PERFECT -> SHOW_ALL
+    fun cycleHideFilter() {
+        _hideFilter.value = when (_hideFilter.value) {
+            HideFilter.SHOW_ALL -> HideFilter.HIDE_RANK10
+            HideFilter.HIDE_RANK10 -> HideFilter.HIDE_PERFECT
+            HideFilter.HIDE_PERFECT -> HideFilter.SHOW_ALL
+        }
     }
 
     //Set which Hisui region to filter the Pokemon list to, or null to clear the filter
