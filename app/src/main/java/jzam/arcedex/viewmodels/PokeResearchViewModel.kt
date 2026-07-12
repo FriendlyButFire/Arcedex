@@ -207,13 +207,32 @@ class PokeResearchViewModel(
             } else {
                 savTask.goalProgress = goalNum
             }
-            repository.delete(task)
-            repository.insert(savTask)
+            repository.update(savTask)
         }
     }
 
     fun setLanguage(lang: SupportedLanguage) {
         language = lang
+    }
+
+    //Builds a copy-pasteable backup string of current research progress
+    fun exportProgressBackup(): String = jzam.arcedex.utils.exportProgress(researchTasks.value)
+
+    //Parses and applies a backup string, returning the number of tasks that were actually
+    //updated. Throws IllegalArgumentException (with a user-facing message) if the string isn't a
+    //valid backup produced by this app.
+    suspend fun importProgressBackup(backup: String): Int {
+        val entries = jzam.arcedex.utils.parseBackup(backup)
+        val currentTasks = researchTasks.value
+        var appliedCount = 0
+        for ((name, task, progress) in entries) {
+            val match = currentTasks.find { it.name == name && it.task == task }
+            if (match != null && match.goalProgress != progress) {
+                repository.update(match.copy(goalProgress = progress))
+                appliedCount++
+            }
+        }
+        return appliedCount
     }
 
     //Flip the hide-completed filter on/off

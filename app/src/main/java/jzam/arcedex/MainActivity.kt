@@ -9,13 +9,16 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,13 +28,18 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import android.content.ClipData
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jzam.arcedex.data.PokeAreaData
 import jzam.arcedex.models.*
@@ -39,6 +47,7 @@ import jzam.arcedex.ui.theme.*
 import jzam.arcedex.utils.*
 import jzam.arcedex.viewmodels.PokeResearchViewModel
 import jzam.arcedex.viewmodels.PokeResearchViewModelFactory
+import kotlinx.coroutines.launch
 
 /*
  * Arcedex by jzam (https://github.com/jzam)
@@ -83,8 +92,11 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
 
     pokeResearchViewModel.setLanguage(language)
 
-    //Recalculate progress on recomposition, based on the latest tasks collected from the DB
-    pokeResearchViewModel.calcProgress()
+    //Recalculate progress only when the underlying research tasks actually change (e.g. after
+    //saving a goal), not on every unrelated recomposition (toggling a filter, changing sort, etc.)
+    LaunchedEffect(researchTasks) {
+        pokeResearchViewModel.calcProgress()
+    }
 
     //Show the main app screen or the initialization screen if we are still waiting on the view
     //model to retrieve all tasks from the repository
@@ -101,7 +113,9 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                     selectedArea = selectedArea,
                     onSortChosen = pokeResearchViewModel::setSort,
                     onHideCompletedToggled = pokeResearchViewModel::toggleHideCompleted,
-                    onAreaChosen = pokeResearchViewModel::setAreaFilter
+                    onAreaChosen = pokeResearchViewModel::setAreaFilter,
+                    onExport = pokeResearchViewModel::exportProgressBackup,
+                    onImport = pokeResearchViewModel::importProgressBackup
                 )
             },
             bottomBar = {
@@ -149,7 +163,8 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
 fun ArcedexTopBar(
     language: SupportedLanguage, userPoints: Int, hideCompleted: Boolean, selectedArea: HisuiArea?,
     onSortChosen: (PokeSort) -> Unit, onHideCompletedToggled: () -> Unit,
-    onAreaChosen: (HisuiArea?) -> Unit
+    onAreaChosen: (HisuiArea?) -> Unit,
+    onExport: () -> String, onImport: suspend (String) -> Int
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 4.dp) {
         Column(
@@ -168,10 +183,14 @@ fun ArcedexTopBar(
                 ResearchRankInfo(language, userPoints)
             }
             Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())
+            ) {
                 HideCompletedButton(hideCompleted, onHideCompletedToggled)
                 SortButton(onSortChosen)
                 RegionButton(selectedArea, onAreaChosen)
+                BackupButton(onExport, onImport)
             }
         }
     }
@@ -311,7 +330,7 @@ fun RegionButton(selectedArea: HisuiArea?, onAreaChosen: (HisuiArea?) -> Unit) {
                     onAreaChosen(null)
                     regionExpanded = false
                 })
-            for (area in HisuiArea.values()) {
+            for (area in HisuiArea.entries) {
                 DropdownMenuItem(
                     text = { Text(areaDisplayName(area)) },
                     onClick = {
@@ -335,6 +354,183 @@ fun areaDisplayName(area: HisuiArea): String {
             HisuiArea.ALABASTER_ICELANDS -> R.string.alabaster_icelands_label
         }
     )
+}
+
+//Chip that opens the backup/restore dialog
+@Composable
+fun BackupButton(onExport: () -> String, onImport: suspend (String) -> Int) {
+    var dialogOpen by remember { mutableStateOf(false) }
+
+    AssistChip(
+        onClick = { dialogOpen = true },
+        label = { Text(stringResource(R.string.backup_label), style = MaterialTheme.typography.labelLarge) },
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            labelColor = MaterialTheme.colorScheme.onSurface
+        ),
+        border = AssistChipDefaults.assistChipBorder(
+            enabled = true,
+            borderColor = MaterialTheme.colorScheme.outline
+        )
+    )
+    if (dialogOpen) {
+        BackupDialog(onExport = onExport, onImport = onImport, onDismiss = { dialogOpen = false })
+    }
+}
+
+//Dialog with two sections: export shows a copy-pasteable backup string for the current progress,
+//import lets you paste one back in to restore/merge progress. The backup only contains
+//goalProgress per (Pokemon, task) - not the static task data itself, which the app already has.
+@Composable
+fun BackupDialog(onExport: () -> String, onImport: suspend (String) -> Int, onDismiss: () -> Unit) {
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
+    var pasteText by remember { mutableStateOf("") }
+    var restoredCount by remember { mutableStateOf<Int?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val backupString = remember { onExport() }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    stringResource(R.string.backup_export_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.backup_export_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        backupString,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .heightIn(max = 100.dp)
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            clipboard.setClipEntry(
+                                ClipEntry(ClipData.newPlainText("Arcedex backup", backupString))
+                            )
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(stringResource(R.string.backup_copy_label))
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    stringResource(R.string.backup_import_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.backup_import_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TextField(
+                    value = pasteText,
+                    onValueChange = {
+                        pasteText = it
+                        restoredCount = null
+                        errorMessage = null
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.outline
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.backup_paste_label)) },
+                    maxLines = 3
+                )
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else if (restoredCount != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.backup_restored_message, restoredCount!!),
+                        color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.backup_close_label))
+                    }
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                try {
+                                    val count = onImport(pasteText)
+                                    errorMessage = null
+                                    restoredCount = count
+                                } catch (e: IllegalArgumentException) {
+                                    restoredCount = null
+                                    errorMessage = e.message
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Text(stringResource(R.string.backup_restore_label))
+                    }
+                }
+            }
+        }
+    }
 }
 
 //Pokedex screen - list Pokemon and click a Pokemon to expand and see their research tasks

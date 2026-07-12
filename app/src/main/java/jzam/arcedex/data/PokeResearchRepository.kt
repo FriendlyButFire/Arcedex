@@ -13,9 +13,14 @@ class PokeResearchRepository(private val pokeResearchDao: PokeResearchDao) {
         return pokeResearchDao.getResearchTasks()
     }
 
+    @Suppress("RedundantSuspendModifier")
     @WorkerThread
     suspend fun insert(task: PokeResearch) {
         pokeResearchDao.insert(task)
+    }
+
+    suspend fun update(task: PokeResearch) {
+        pokeResearchDao.update(task)
     }
 
     suspend fun delete(task: PokeResearch) {

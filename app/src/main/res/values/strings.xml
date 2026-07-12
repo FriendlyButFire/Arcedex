@@ -13,6 +13,16 @@
     <string name="cobalt_coastlands_label">Cobalt Coastlands</string>
     <string name="coronet_highlands_label">Coronet Highlands</string>
     <string name="alabaster_icelands_label">Alabaster Icelands</string>
+    <string name="backup_label">BACKUP</string>
+    <string name="backup_export_title">Export progress</string>
+    <string name="backup_export_description">Copy this code somewhere safe. Paste it back in on any install to restore your progress.</string>
+    <string name="backup_copy_label">Copy to clipboard</string>
+    <string name="backup_import_title">Restore progress</string>
+    <string name="backup_import_description">Paste a previously exported code below.</string>
+    <string name="backup_paste_label">Backup code</string>
+    <string name="backup_close_label">Close</string>
+    <string name="backup_restore_label">Restore</string>
+    <string name="backup_restored_message">%1$d tasks restored</string>
     <string name="pokemon_pic_desc" translatable="false">Pokemon pic</string>
     <string name="pokeball_pic_desc" translatable="false">Pokeball pic</string>
     <string name="red_quote" translatable="false">...</string>
