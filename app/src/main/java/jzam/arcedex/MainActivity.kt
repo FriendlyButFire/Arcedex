@@ -306,6 +306,12 @@ fun SortButton(onSortChosen: (PokeSort) -> Unit) {
                     onSortChosen(PokeSort.NATIONAL)
                     sortExpanded = false
                 })
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.research_level_sort_label)) },
+                onClick = {
+                    onSortChosen(PokeSort.RESEARCH_LEVEL)
+                    sortExpanded = false
+                })
         }
     }
 }

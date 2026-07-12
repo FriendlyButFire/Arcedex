@@ -10,7 +10,7 @@ data class Pokemon(
 
 //Enums representing sort options
 enum class PokeSort {
-    NATIONAL, ALPHABETICAL, HISUI
+    NATIONAL, ALPHABETICAL, HISUI, RESEARCH_LEVEL
 }
 
 //The five overworld regions of Hisui where Pokemon can be encountered in the wild

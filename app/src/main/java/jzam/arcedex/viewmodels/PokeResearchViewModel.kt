@@ -127,21 +127,31 @@ class PokeResearchViewModel(
         _userPoints.value = points
     }
 
+    //Sorts a Pokemon list according to the current sort mode. Shared by setSort and searchClear
+    //so the sort logic (including the research-level tie-break) only lives in one place.
+    private fun sortedPokedex(list: List<Pokemon>): List<Pokemon> {
+        return when (_pokesort.value) {
+            PokeSort.ALPHABETICAL -> list.sortedBy { translate(language, it.name) }
+            PokeSort.NATIONAL -> list.sortedBy { it.natId }
+            PokeSort.RESEARCH_LEVEL -> {
+                //Most progress first (Perfect, then Rank10, then in-progress, then untouched),
+                //tie-broken by Hisui dex order
+                val progressByName = _researchProgress.value.associateBy { it.name }
+                list.sortedWith(
+                    compareByDescending<Pokemon> { pokemon ->
+                        val prog = progressByName[pokemon.name]
+                        (prog?.pointsDone ?: 0) + (prog?.bonusEarned ?: 0)
+                    }.thenBy { it.hisuiId }
+                )
+            }
+            else -> list.sortedBy { it.hisuiId }
+        }
+    }
+
     //Set and execute the sorting.
     fun setSort(sort: PokeSort) {
         _pokesort.value = sort
-
-        when (sort) {
-            PokeSort.ALPHABETICAL -> {
-                _pokedex.value = pokedex.value.sortedBy { translate(language, it.name) }
-            }
-            PokeSort.NATIONAL -> {
-                _pokedex.value = pokedex.value.sortedBy { it.natId }
-            }
-            else -> {
-                _pokedex.value = pokedex.value.sortedBy { it.hisuiId }
-            }
-        }
+        _pokedex.value = sortedPokedex(pokedex.value)
     }
 
     //Search for given text in research task list. Can match on Pokemon name or description of a
@@ -181,18 +191,7 @@ class PokeResearchViewModel(
 
     //Reset the search variables
     fun searchClear() {
-
-        when (_pokesort.value) {
-            PokeSort.ALPHABETICAL -> {
-                _pokedex.value = Pokedex.pokedex.sortedBy { translate(language, it.name) }
-            }
-            PokeSort.NATIONAL -> {
-                _pokedex.value = Pokedex.pokedex.sortedBy { it.natId }
-            }
-            else -> {
-                _pokedex.value = Pokedex.pokedex.sortedBy { it.hisuiId }
-            }
-        }
+        _pokedex.value = sortedPokedex(Pokedex.pokedex)
         _searchedText.value = ""
         _inSearchMode.value = true
     }

@@ -3,6 +3,7 @@
     <string name="sort_label">SORT</string>
     <string name="hisui_sort_label">Hisui</string>
     <string name="national_sort_label">National</string>
+    <string name="research_level_sort_label">Research Level</string>
     <string name="alpha_sort_label">Alphabetical</string>
     <string name="filter_show_all_label">SHOW ALL</string>
     <string name="filter_hide_rank10_label">HIDE RANK10+</string>
