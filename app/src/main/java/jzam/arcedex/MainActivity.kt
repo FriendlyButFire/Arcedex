@@ -828,14 +828,19 @@ fun TaskRow(
     }
 }
 
-//Points icon. 20 = double points, 10 = standard points
+//Points icon - only shown for tasks that actually give double points (points == 20). A same-size
+//Spacer keeps every row's icon column aligned regardless of whether this task has one.
 @Composable
 fun PointsIcon(points: Int) {
-    val color = if (points == 20) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    PokemonImage(
-        imgId = R.drawable.double_points, size = 22,
-        desc = stringResource(id = R.string.points_icon_desc), color = color, alpha = 1f
-    )
+    if (points == 20) {
+        PokemonImage(
+            imgId = R.drawable.double_points, size = 22,
+            desc = stringResource(id = R.string.points_icon_desc),
+            color = MaterialTheme.colorScheme.primary, alpha = 1f
+        )
+    } else {
+        Spacer(modifier = Modifier.size(22.dp))
+    }
 }
 
 //Task description that will show move type if it's for a Pokemon move, using an assist chip
