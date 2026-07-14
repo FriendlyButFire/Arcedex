@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import android.content.ClipData
 import androidx.compose.ui.text.input.ImeAction
@@ -660,7 +661,11 @@ fun BackupDialog(onExport: () -> String, onImport: suspend (String) -> Int, onDi
                 } else if (restoredCount != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        stringResource(R.string.backup_restored_message, restoredCount!!),
+                        pluralStringResource(
+                            R.plurals.backup_restored_message,
+                            restoredCount!!,
+                            restoredCount!!
+                        ),
                         color = MaterialTheme.colorScheme.tertiary,
                         style = MaterialTheme.typography.bodyMedium
                     )

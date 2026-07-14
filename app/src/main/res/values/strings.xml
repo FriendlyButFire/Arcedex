@@ -44,10 +44,12 @@
     <string name="backup_paste_label">Backup code</string>
     <string name="backup_close_label">Close</string>
     <string name="backup_restore_label">Restore</string>
-    <string name="backup_restored_message">%1$d tasks restored</string>
+    <plurals name="backup_restored_message">
+        <item quantity="one">%1$d task restored</item>
+        <item quantity="other">%1$d tasks restored</item>
+    </plurals>
     <string name="pokemon_pic_desc" translatable="false">Pokemon pic</string>
     <string name="pokeball_pic_desc" translatable="false">Pokeball pic</string>
-    <string name="red_quote" translatable="false">...</string>
     <string name="search_fail_message">Nothing to see here. Clear search and try again.</string>
     <string name="points_icon_desc" translatable="false">Points icon</string>
     <string name="clear_label">CLEAR</string>
