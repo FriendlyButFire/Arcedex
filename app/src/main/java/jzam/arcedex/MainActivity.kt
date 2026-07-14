@@ -94,7 +94,10 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
     val selectedCategoryType by pokeResearchViewModel.selectedCategoryType.collectAsStateWithLifecycle()
     val language = getSupportedLanguage(LocaleList.current)
 
-    pokeResearchViewModel.setLanguage(language)
+    // Side-effect: update ViewModel's language only when locale actually changes, not on every recomposition
+    LaunchedEffect(language) {
+        pokeResearchViewModel.setLanguage(language)
+    }
 
     //Recalculate progress only when the underlying research tasks actually change (e.g. after
     //saving a goal), not on every unrelated recomposition (toggling a filter, changing sort, etc.)
@@ -719,7 +722,7 @@ fun Pokedex(
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(pokedex) {
+            items(pokedex, key = { it.name }) {
                 PokedexPokemon(
                     language = language,
                     pokemon = it,

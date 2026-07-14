@@ -1,6 +1,7 @@
 package jzam.arcedex
 
 import android.app.Application
+import android.os.StrictMode
 import jzam.arcedex.data.PokeResearchDatabase
 import jzam.arcedex.data.PokeResearchRepository
 import kotlinx.coroutines.CoroutineScope
@@ -17,4 +18,25 @@ class ArcedexApplication : Application() {
     //by lazy ensures these are only created when needed rather than on app startup
     val pokeResearchDatabase by lazy { PokeResearchDatabase.getDatabase(this, applicationScope) }
     val pokeResearchRepository by lazy { PokeResearchRepository(pokeResearchDatabase.pokeResearchDao()) }
+
+    override fun onCreate() {
+        super.onCreate()
+        if (BuildConfig.DEBUG) {
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectAll()
+                    .penaltyLog()
+                    .build()
+            )
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectLeakedSqlLiteObjects()
+                    .detectLeakedClosableObjects()
+                    .detectActivityLeaks()
+                    .detectFileUriExposure()
+                    .penaltyLog()
+                    .build()
+            )
+        }
+    }
 }

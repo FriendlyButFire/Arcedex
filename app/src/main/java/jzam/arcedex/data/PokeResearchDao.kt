@@ -12,6 +12,9 @@ interface PokeResearchDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(task: PokeResearch)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(tasks: List<PokeResearch>)
+
     @Update
     suspend fun update(task: PokeResearch)
 
@@ -25,6 +28,6 @@ interface PokeResearchDao {
     fun getResearchTasks(): Flow<List<PokeResearch>>
 
     @Query("SELECT COUNT(*) FROM pokeresearch_table")
-    fun getCount(): Int
+    suspend fun getCount(): Int
 
 }

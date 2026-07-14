@@ -9,7 +9,18 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
-/captures
-.externalNativeBuild
+/app/build
+/**/build/
 .cxx
+.externalNativeBuild
+/captures
+*.jks
+*.keystore
+.kotlin/
 local.properties
+# Android Studio 3.6+ - included builds
+.navigation/
+# NDK
+obj/
+# Keystore
+*.keystore

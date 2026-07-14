@@ -31,7 +31,7 @@ android {
     buildFeatures {
         compose = true
     }
-    packagingOptions {
+    packaging {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
@@ -60,10 +60,9 @@ dependencies {
     implementation libs.androidx.lifecycle.viewmodel.ktx
     implementation libs.androidx.lifecycle.common.java8
 
-    // Kotlin components
-    implementation libs.kotlin.stdlib.jdk7
-    api libs.kotlinx.coroutines.core
-    api libs.kotlinx.coroutines.android
+    // Kotlin components - stdlib is provided by Kotlin plugin automatically (jdk7 artifact deprecated)
+    implementation libs.kotlinx.coroutines.core
+    implementation libs.kotlinx.coroutines.android
 
 
     testImplementation libs.junit

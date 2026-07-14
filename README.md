@@ -52,6 +52,40 @@ It adds move-type buttons for damage-dealing moves that can be clicked to quickl
 
 Feedback on Japanese translations is welcome as I had to use online translations for some words.
 
+## Development Setup
+
+**Requirements:**
+- Java 17 Temurin (e.g. `Eclipse Temurin 17.0.19+10`) — `kotlin { jvmToolchain(17) }`
+- Android SDK with Platform 37 (Android 16) — `compileSdk = 37`, `targetSdk = 37`, `minSdk = 23`
+  - Install via Android Studio SDK Manager or `sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"`
+- Gradle 9.6.1 via wrapper (`./gradlew`)
+
+**Build & Run:**
+```bash
+# Clone
+git clone https://github.com/FriendlyButFire/Arcedex.git
+cd Arcedex
+
+# Verify Java
+java -version  # should show Temurin 17
+
+# Lint (should be 0 errors after fixes)
+./gradlew lintDebug --no-daemon
+
+# Unit tests (once added)
+./gradlew testDebugUnitTest --no-daemon
+
+# Assemble debug APK
+./gradlew assembleDebug --no-daemon
+# APK at app/build/outputs/apk/debug/app-debug.apk
+```
+
+**Project hygiene:**
+- `lintDebug` must pass with 0 errors (warnings: AGP/Kotlin version info only)
+- `drawable-nodpi/` holds 246 sprite PNGs (previously `drawable/` triggered IconLocation warnings)
+- Japanese translations in `values-ja/strings.xml` — keep in sync with `values/strings.xml`
+- Room DB auto-backup disabled (`allowBackup=false` + `data_extraction_rules.xml`); manual backup via copy-paste in app
+
 ## Android Concepts Used
 * Model-View-ViewModel (MVVM) architecture
 * Jetpack Compose for implementing UI

@@ -2,14 +2,19 @@ package jzam.arcedex.models
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /*
  * A PokemonResearch object represents a research task. Tasks are associated with a Pokemon (name).
  * Tasks have descriptions (task), up to 5 goals within the task, progress of goals completed,
  * and a points value for each goal completed.
+ * Logical key is (name, task) — unique index prevents accidental duplicates that OnConflict IGNORE would silently hide.
  */
-@Entity(tableName = "pokeresearch_table")
+@Entity(
+    tableName = "pokeresearch_table",
+    indices = [Index(value = ["name", "task"], unique = true)]
+)
 data class PokeResearch(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0L,

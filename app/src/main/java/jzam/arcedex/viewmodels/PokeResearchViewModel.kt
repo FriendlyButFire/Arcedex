@@ -163,8 +163,15 @@ class PokeResearchViewModel(
     }
 
     //Search for given text in research task list. Can match on Pokemon name or description of a
-    //task. Set Pokemon list to filtered list.
+    //task. Set Pokemon list to filtered list. Trims whitespace and ignores blank searches.
     fun searchPokedex(searchText: String) {
+        val trimmed = searchText.trim()
+        if (trimmed.isBlank()) {
+            // Blank / whitespace-only search would previously match everything via contains("").
+            // Treat as clear (show all) rather than empty result.
+            searchClear()
+            return
+        }
         searchClear()
         var idx = 0
         val matchingPokemon: MutableList<Pokemon> = mutableListOf()
@@ -173,7 +180,7 @@ class PokeResearchViewModel(
         val oldPokedex = pokedex.value
         var translatedName: String
         var translatedTask: String
-        val findText = translate(language, searchText).lowercase()
+        val findText = translate(language, trimmed).lowercase()
         for (task in taskList) {
             translatedName = translate(language, task.name).lowercase()
             translatedTask = translate(language, task.task).lowercase()
@@ -193,7 +200,7 @@ class PokeResearchViewModel(
         }
         _pokedex.value = matchingPokemon
         _inSearchMode.value = false
-        _searchedText.value = searchText
+        _searchedText.value = trimmed
         setSort(pokesort.value)
     }
 
