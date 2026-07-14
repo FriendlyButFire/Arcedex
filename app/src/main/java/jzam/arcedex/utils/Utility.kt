@@ -6,6 +6,7 @@ import jzam.arcedex.data.PokeMovesData
 import jzam.arcedex.data.PokeResearchData
 import jzam.arcedex.data.PokeTranslateData
 import jzam.arcedex.models.SupportedLanguage
+import jzam.arcedex.models.TaskCategory
 
 /*
  * General utility methods for the app
@@ -135,6 +136,44 @@ fun getMoveType(task: String): String {
         return (move.type)
     }
     return ""
+}
+
+//Categorizes a research task's text into a TaskCategory "verb", independent of which Pokemon it
+//belongs to. Matched against the fixed set of task phrasings used throughout PokeResearchData -
+//uses "." in place of the apostrophe in regexes since the source data uses a typographic
+//apostrophe (’) rather than a straight one, and this way the match doesn't depend on getting that
+//exact character right.
+fun getTaskCategory(task: String): TaskCategory? {
+    return when {
+        task.startsWith("Number caught") -> TaskCategory.CATCH
+        task == "Number of alpha specimens caught" -> TaskCategory.CATCH_ALPHA
+        Regex("Number of heavy specimens you.ve caught").matches(task) -> TaskCategory.CATCH_HEAVY
+        Regex("Number of light specimens you.ve caught").matches(task) -> TaskCategory.CATCH_LIGHT
+        Regex("Number of large specimens you.ve caught").matches(task) -> TaskCategory.CATCH_LARGE
+        Regex("Number of small specimens you.ve caught").matches(task) -> TaskCategory.CATCH_SMALL
+        Regex("Number you.ve caught while they were in the air").matches(task) -> TaskCategory.CATCH_AIRBORNE
+        Regex("Number you.ve caught while they were sleeping").matches(task) -> TaskCategory.CATCH_SLEEPING
+        Regex("Number you.ve caught without being spotted").matches(task) -> TaskCategory.CATCH_UNNOTICED
+        task == "Number defeated" -> TaskCategory.DEFEAT
+        Regex("Number you.ve defeated with [A-Za-z]+-type moves").matches(task) -> TaskCategory.DEFEAT
+        Regex("Number you.ve evolved").matches(task) -> TaskCategory.EVOLVE
+        Regex("Number of different forms you.ve obtained").matches(task) -> TaskCategory.EVOLVE
+        task.startsWith("Times you’ve seen it use") -> TaskCategory.MOVE_SEEN
+        Regex("Times you.ve given it food").matches(task) -> TaskCategory.FEED
+        task.startsWith("Number you’ve seen leap out of") -> TaskCategory.ENVIRONMENT
+        Regex("Times you.ve scared it off with a Scatter Bang").matches(task) -> TaskCategory.ITEM_USE
+        Regex("Times you.ve stunned it by using items").matches(task) -> TaskCategory.ITEM_USE
+        task.startsWith("Investigated") -> TaskCategory.INVESTIGATE
+        else -> null
+    }
+}
+
+//Extracts the elemental type from a "Number you've defeated with X-type moves" task, in the same
+//ALL-CAPS format getMoveType()/getTypeColor() expect (e.g. "FIRE"). Returns "" for the plain
+//"Number defeated" task, which has no type restriction.
+fun getDefeatType(task: String): String {
+    val match = Regex("Number you.ve defeated with ([A-Za-z]+)-type moves").find(task)
+    return match?.groupValues?.get(1)?.uppercase() ?: ""
 }
 
 fun getTypeColor(type: String): Color {

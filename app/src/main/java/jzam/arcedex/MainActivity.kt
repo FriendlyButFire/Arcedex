@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jzam.arcedex.data.PokeAreaData
+import jzam.arcedex.data.PokeMovesData
 import jzam.arcedex.models.*
 import jzam.arcedex.ui.theme.*
 import jzam.arcedex.utils.*
@@ -88,6 +89,8 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
     val pokemonToResearchTasks by pokeResearchViewModel.pokemonToResearchTasks.collectAsStateWithLifecycle()
     val hideFilter by pokeResearchViewModel.hideFilter.collectAsStateWithLifecycle()
     val selectedArea by pokeResearchViewModel.selectedArea.collectAsStateWithLifecycle()
+    val selectedCategory by pokeResearchViewModel.selectedCategory.collectAsStateWithLifecycle()
+    val selectedCategoryType by pokeResearchViewModel.selectedCategoryType.collectAsStateWithLifecycle()
     val language = getSupportedLanguage(LocaleList.current)
 
     pokeResearchViewModel.setLanguage(language)
@@ -111,9 +114,13 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                     userPoints = userPoints,
                     hideFilter = hideFilter,
                     selectedArea = selectedArea,
+                    selectedCategory = selectedCategory,
+                    selectedCategoryType = selectedCategoryType,
                     onSortChosen = pokeResearchViewModel::setSort,
                     onHideFilterCycled = pokeResearchViewModel::cycleHideFilter,
                     onAreaChosen = pokeResearchViewModel::setAreaFilter,
+                    onCategoryChosen = pokeResearchViewModel::setCategoryFilter,
+                    onCategoryTypeChosen = pokeResearchViewModel::setCategoryTypeFilter,
                     onExport = pokeResearchViewModel::exportProgressBackup,
                     onImport = pokeResearchViewModel::importProgressBackup
                 )
@@ -148,6 +155,16 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
                     .filter { pokemon ->
                         selectedArea == null || PokeAreaData.getAreas(pokemon.hisuiId).contains(selectedArea)
                     }
+                    .filter { pokemon ->
+                        val category = selectedCategory ?: return@filter true
+                        val tasks = pokemonToResearchTasks[pokemon.name] ?: return@filter false
+                        tasks.any { task ->
+                            getTaskCategory(task.task) == category &&
+                                    task.goalProgress < task.totalGoals &&
+                                    (selectedCategoryType == null ||
+                                            taskCategoryTypeOf(category, task.task) == selectedCategoryType)
+                        }
+                    }
                 Pokedex(
                     language = language,
                     pokedex = displayedPokedex,
@@ -163,12 +180,24 @@ fun ArcedexApp(pokeResearchViewModel: PokeResearchViewModel) {
     }
 }
 
+//Extracts the type relevant to a given category's task text - Defeat tasks embed the type
+//directly ("...with Fire-type moves"), Move Seen tasks need a move-name lookup via getMoveType()
+private fun taskCategoryTypeOf(category: TaskCategory, taskText: String): String {
+    return when (category) {
+        TaskCategory.DEFEAT -> getDefeatType(taskText)
+        TaskCategory.MOVE_SEEN -> getMoveType(taskText)
+        else -> ""
+    }
+}
+
 //App's top bar - Shows app name, research rank progress, and filter/sort chips
 @Composable
 fun ArcedexTopBar(
     language: SupportedLanguage, userPoints: Int, hideFilter: HideFilter, selectedArea: HisuiArea?,
+    selectedCategory: TaskCategory?, selectedCategoryType: String?,
     onSortChosen: (PokeSort) -> Unit, onHideFilterCycled: () -> Unit,
     onAreaChosen: (HisuiArea?) -> Unit,
+    onCategoryChosen: (TaskCategory?) -> Unit, onCategoryTypeChosen: (String?) -> Unit,
     onExport: () -> String, onImport: suspend (String) -> Int
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 4.dp) {
@@ -195,6 +224,11 @@ fun ArcedexTopBar(
                 HideFilterButton(hideFilter, onHideFilterCycled)
                 SortButton(onSortChosen)
                 RegionButton(selectedArea, onAreaChosen)
+                CategoryButton(selectedCategory, onCategoryChosen)
+                //Type is only meaningful once a category that has a type dimension is selected
+                if (selectedCategory == TaskCategory.DEFEAT || selectedCategory == TaskCategory.MOVE_SEEN) {
+                    CategoryTypeButton(selectedCategoryType, onCategoryTypeChosen)
+                }
                 BackupButton(onExport, onImport)
             }
         }
@@ -372,6 +406,118 @@ fun areaDisplayName(area: HisuiArea): String {
             HisuiArea.COBALT_COASTLANDS -> R.string.cobalt_coastlands_label
             HisuiArea.CORONET_HIGHLANDS -> R.string.coronet_highlands_label
             HisuiArea.ALABASTER_ICELANDS -> R.string.alabaster_icelands_label
+        }
+    )
+}
+
+//Chip that opens the task-category filter menu - filters the Pokemon list down to those with an
+//unfinished task of the selected category (e.g. "who still needs a Defeat task done")
+@Composable
+fun CategoryButton(selectedCategory: TaskCategory?, onCategoryChosen: (TaskCategory?) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        AssistChip(
+            onClick = { expanded = true },
+            label = {
+                Text(
+                    selectedCategory?.let { categoryDisplayName(it) } ?: stringResource(R.string.category_label),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            },
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = if (selectedCategory != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                labelColor = if (selectedCategory != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            ),
+            border = if (selectedCategory != null) null else AssistChipDefaults.assistChipBorder(
+                enabled = true,
+                borderColor = MaterialTheme.colorScheme.outline
+            )
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.all_categories_label)) },
+                onClick = {
+                    onCategoryChosen(null)
+                    expanded = false
+                })
+            for (category in TaskCategory.values()) {
+                DropdownMenuItem(
+                    text = { Text(categoryDisplayName(category)) },
+                    onClick = {
+                        onCategoryChosen(category)
+                        expanded = false
+                    })
+            }
+        }
+    }
+}
+
+//Chip that opens the secondary elemental-type filter, shown only when the selected category has
+//a type dimension (Defeat / Move Seen). Reuses the same type list as the move-type chips.
+@Composable
+fun CategoryTypeButton(selectedType: String?, onTypeChosen: (String?) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val types = remember { PokeMovesData.typeColors.map { it.type } }
+
+    Box {
+        AssistChip(
+            onClick = { expanded = true },
+            label = {
+                Text(
+                    selectedType ?: stringResource(R.string.type_label),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            },
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = if (selectedType != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant,
+                labelColor = if (selectedType != null) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurface
+            ),
+            border = if (selectedType != null) null else AssistChipDefaults.assistChipBorder(
+                enabled = true,
+                borderColor = MaterialTheme.colorScheme.outline
+            )
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.any_type_label)) },
+                onClick = {
+                    onTypeChosen(null)
+                    expanded = false
+                })
+            for (type in types) {
+                DropdownMenuItem(
+                    text = { Text(type) },
+                    onClick = {
+                        onTypeChosen(type)
+                        expanded = false
+                    })
+            }
+        }
+    }
+}
+
+//Localized display name for a task category
+@Composable
+fun categoryDisplayName(category: TaskCategory): String {
+    return stringResource(
+        when (category) {
+            TaskCategory.CATCH -> R.string.category_catch_label
+            TaskCategory.CATCH_ALPHA -> R.string.category_catch_alpha_label
+            TaskCategory.CATCH_HEAVY -> R.string.category_catch_heavy_label
+            TaskCategory.CATCH_LIGHT -> R.string.category_catch_light_label
+            TaskCategory.CATCH_LARGE -> R.string.category_catch_large_label
+            TaskCategory.CATCH_SMALL -> R.string.category_catch_small_label
+            TaskCategory.CATCH_AIRBORNE -> R.string.category_catch_airborne_label
+            TaskCategory.CATCH_SLEEPING -> R.string.category_catch_sleeping_label
+            TaskCategory.CATCH_UNNOTICED -> R.string.category_catch_unnoticed_label
+            TaskCategory.DEFEAT -> R.string.category_defeat_label
+            TaskCategory.MOVE_SEEN -> R.string.category_move_seen_label
+            TaskCategory.EVOLVE -> R.string.category_evolve_label
+            TaskCategory.FEED -> R.string.category_feed_label
+            TaskCategory.ENVIRONMENT -> R.string.category_environment_label
+            TaskCategory.ITEM_USE -> R.string.category_item_use_label
+            TaskCategory.INVESTIGATE -> R.string.category_investigate_label
         }
     )
 }

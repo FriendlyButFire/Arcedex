@@ -71,6 +71,14 @@ class PokeResearchViewModel(
     private val _selectedArea: MutableStateFlow<HisuiArea?> = MutableStateFlow(null)
     val selectedArea: StateFlow<HisuiArea?> = _selectedArea.asStateFlow()
 
+    //Which research task category the list is filtered to, null means no filter
+    private val _selectedCategory: MutableStateFlow<TaskCategory?> = MutableStateFlow(null)
+    val selectedCategory: StateFlow<TaskCategory?> = _selectedCategory.asStateFlow()
+
+    //Secondary move-type filter, only meaningful when selectedCategory is DEFEAT or MOVE_SEEN
+    private val _selectedCategoryType: MutableStateFlow<String?> = MutableStateFlow(null)
+    val selectedCategoryType: StateFlow<String?> = _selectedCategoryType.asStateFlow()
+
     private var language = SupportedLanguage.ENGLISH
 
     //Calculates research progress for each Pokemon and builds map of Pokemon name to their research
@@ -248,6 +256,20 @@ class PokeResearchViewModel(
     //Set which Hisui region to filter the Pokemon list to, or null to clear the filter
     fun setAreaFilter(area: HisuiArea?) {
         _selectedArea.value = area
+    }
+
+    //Set which research task category to filter the Pokemon list to. Resets the secondary type
+    //filter whenever the category changes, since a type only makes sense paired with the
+    //category it was chosen under (e.g. picking Defeat, then Fire, then switching to Catch
+    //shouldn't silently keep "Fire" applied to a category that has no type dimension)
+    fun setCategoryFilter(category: TaskCategory?) {
+        _selectedCategory.value = category
+        _selectedCategoryType.value = null
+    }
+
+    //Set the secondary type filter (only meaningful under Defeat/Move Seen), or null to clear it
+    fun setCategoryTypeFilter(type: String?) {
+        _selectedCategoryType.value = type
     }
 }
 

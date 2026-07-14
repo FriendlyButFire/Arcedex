@@ -24,3 +24,12 @@ enum class HisuiArea {
 enum class HideFilter {
     SHOW_ALL, HIDE_RANK10, HIDE_PERFECT
 }
+
+//Categorizes research task text into a "verb" - what kind of task it is, independent of which
+//Pokemon it belongs to. Lets the app filter/search across all 242 Pokemon by task type (e.g. "who
+//still needs a Defeat-with-Fire-type task done") rather than just by move type as before.
+enum class TaskCategory {
+    CATCH, CATCH_ALPHA, CATCH_HEAVY, CATCH_LIGHT, CATCH_LARGE, CATCH_SMALL, CATCH_AIRBORNE,
+    CATCH_SLEEPING, CATCH_UNNOTICED, DEFEAT, MOVE_SEEN, EVOLVE, FEED, ENVIRONMENT, ITEM_USE,
+    INVESTIGATE
+}
