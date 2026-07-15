@@ -105,15 +105,9 @@ fun getRankProgress(points: Float): Float {
 }
 
 fun translate(lang: SupportedLanguage, text: String): String {
-
-    val translation = when (lang) {
-        SupportedLanguage.JAPANESE -> PokeTranslateData.jp.find { it.oldText == text }
-        else -> null
-    }
-    if (translation != null) {
-        return translation.newText
-    } else {
-        return text
+    return when (lang) {
+        SupportedLanguage.JAPANESE -> PokeTranslateData.jpTranslationMap[text] ?: text
+        else -> text
     }
 }
 
@@ -131,9 +125,9 @@ fun getSupportedLanguage(locales: LocaleList): SupportedLanguage {
 
 fun getMoveType(task: String): String {
     val moveName = task.replace("Times you’ve seen it use ", "")
-    val move = PokeMovesData.moves.find { it.name == moveName }
+    val move = PokeMovesData.moveByNameMap[moveName]
     if (move != null && move.power != "—") {
-        return (move.type)
+        return move.type
     }
     return ""
 }
@@ -187,9 +181,5 @@ fun getDefeatType(task: String): String {
 }
 
 fun getTypeColor(type: String): Color {
-    val typeColor = PokeMovesData.typeColors.find { it.type == type}
-    if (typeColor != null) {
-        return typeColor.color
-    }
-    return Color.White
+    return PokeMovesData.typeColorMap[type] ?: Color.White
 }

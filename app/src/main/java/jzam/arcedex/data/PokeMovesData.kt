@@ -178,4 +178,12 @@ object PokeMovesData {
         MoveColor(type = "STEEL", color = Color(0xFFB8B8D0)),
         MoveColor(type = "WATER", color = Color(0xFF6890F0)),
     )
+
+    val moveByNameMap: Map<String, PokeMove> by lazy {
+        moves.associateBy { it.name }
+    }
+
+    val typeColorMap: Map<String, Color> by lazy {
+        typeColors.associate { it.type to it.color }
+    }
 }

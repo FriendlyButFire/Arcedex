@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
  * Set up the room database for the PokeResearch data. Ensures there's only 1 instance of the
  * database for the whole app. Populates database on creation.
  */
-@Database(entities = arrayOf(PokeResearch::class), version = 1, exportSchema = false)
+@Database(entities = arrayOf(PokeResearch::class), version = 1, exportSchema = true)
 public abstract class PokeResearchDatabase : RoomDatabase() {
 
     abstract fun pokeResearchDao(): PokeResearchDao

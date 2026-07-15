@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +31,8 @@ fun Pokedex(
     onMoveClick: (String) -> Unit,
     hideFinishedTasks: Boolean
 ) {
+    val progressMap = remember(progress) { progress.associateBy { it.name } }
+
     if (pokedex.isNotEmpty()) {
         LazyColumn(
             contentPadding = PaddingValues(12.dp),
@@ -40,7 +43,7 @@ fun Pokedex(
                     language = language,
                     pokemon = it,
                     tasks = pokemonToResearchTasks?.get(it.name),
-                    progress = progress,
+                    progressMap = progressMap,
                     pokeSort = pokeSort,
                     onGoalClick = onGoalClick,
                     onMoveClick = onMoveClick,
@@ -57,15 +60,16 @@ fun Pokedex(
 @Composable
 fun ShowEmptySearch() {
     val emptyPokemon = PokedexData.emptyDex
-    val emptyResearch =
-        listOf(
-            ResearchProgress(
+    val emptyResearchMap = remember {
+        mapOf(
+            emptyPokemon.name to ResearchProgress(
                 name = emptyPokemon.name,
                 goalsTotal = 0,
                 pointsTotal = 1,
                 pointsDone = 1
             )
         )
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -80,7 +84,7 @@ fun ShowEmptySearch() {
             PokemonHeaderRow(
                 language = SupportedLanguage.ENGLISH,
                 pokemon = emptyPokemon,
-                progress = emptyResearch,
+                progressMap = emptyResearchMap,
                 pokeSort = PokeSort.HISUI,
                 isExpanded = false,
                 onClick = {})

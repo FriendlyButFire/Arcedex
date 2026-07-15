@@ -1,15 +1,23 @@
 package jzam.arcedex.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import jzam.arcedex.R
 import jzam.arcedex.models.PokeResearch
 import jzam.arcedex.models.SupportedLanguage
@@ -28,17 +36,22 @@ fun TaskRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         PointsIcon(points = pokemonTask.points)
         TaskText(language, pokemonTask.task, onMoveClick)
-        GoalText(language = language, goal = pokemonTask.goal1, goalNum = 1, pokemonTask, onGoalClick)
-        GoalText(language = language, goal = pokemonTask.goal2, goalNum = 2, pokemonTask, onGoalClick)
-        GoalText(language = language, goal = pokemonTask.goal3, goalNum = 3, pokemonTask, onGoalClick)
-        GoalText(language = language, goal = pokemonTask.goal4, goalNum = 4, pokemonTask, onGoalClick)
-        GoalText(language = language, goal = pokemonTask.goal5, goalNum = 5, pokemonTask, onGoalClick)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            GoalText(language = language, goal = pokemonTask.goal1, goalNum = 1, pokemonTask, onGoalClick)
+            GoalText(language = language, goal = pokemonTask.goal2, goalNum = 2, pokemonTask, onGoalClick)
+            GoalText(language = language, goal = pokemonTask.goal3, goalNum = 3, pokemonTask, onGoalClick)
+            GoalText(language = language, goal = pokemonTask.goal4, goalNum = 4, pokemonTask, onGoalClick)
+            GoalText(language = language, goal = pokemonTask.goal5, goalNum = 5, pokemonTask, onGoalClick)
+        }
     }
 }
 
@@ -48,42 +61,54 @@ fun TaskRow(
 fun PointsIcon(points: Int) {
     if (points == 20) {
         PokemonImage(
-            imgId = R.drawable.double_points, size = 22,
+            imgId = R.drawable.double_points, size = 20,
             desc = stringResource(id = R.string.points_icon_desc),
             color = MaterialTheme.colorScheme.primary, alpha = 1f
         )
     } else {
-        Spacer(modifier = Modifier.size(22.dp))
+        Spacer(modifier = Modifier.size(20.dp))
     }
 }
 
-//Task description that will show move type if it's for a Pokemon move, using an assist chip
-//since tapping it triggers a search action.
+//Task description with optional compact move type badge
 @Composable
 fun RowScope.TaskText(language: SupportedLanguage, task: String, onMoveClick: (String) -> Unit) {
-    Column(modifier = Modifier.weight(1f)) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .padding(horizontal = 6.dp)
+    ) {
         Text(
             translate(language, task),
             color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 8.dp)
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 13.5.sp,
+                lineHeight = 17.sp
+            )
         )
 
         val type = getMoveType(task)
-        val typeText = translate(language, "-type")
-        val translatedType = translate(language, type)
         if (type.isNotBlank()) {
+            val typeText = translate(language, "-type")
+            val translatedType = translate(language, type)
             val bgColor = getTypeColor(type)
-            AssistChip(
-                onClick = { onMoveClick(("$translatedType$typeText")) },
-                label = { Text(translate(language, type), style = MaterialTheme.typography.labelMedium) },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = bgColor,
-                    labelColor = Color.White
-                ),
-                border = null,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
+
+            Spacer(modifier = Modifier.height(3.dp))
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = bgColor,
+                modifier = Modifier
+                    .semantics { role = Role.Button }
+                    .clickable { onMoveClick("$translatedType$typeText") }
+            ) {
+                Text(
+                    text = translate(language, type),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
         }
     }
 }
@@ -100,20 +125,26 @@ fun GoalText(
         Surface(
             shape = CircleShape,
             color = if (reached) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant,
-            border = if (reached) null else androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outline
-            ),
+            border = if (reached) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
-                .padding(horizontal = 2.dp)
+                .semantics { role = Role.Button }
                 .clickable { onGoalClick(pokemonTask, goalNum) }
         ) {
-            Text(
-                translate(lang = language, text = goal),
-                color = if (reached) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 30.dp, minHeight = 30.dp)
+                    .padding(horizontal = 5.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    translate(lang = language, text = goal),
+                    color = if (reached) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 11.5.sp
+                    ),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

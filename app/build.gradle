@@ -27,6 +27,7 @@ android {
             minifyEnabled = true
             shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig = signingConfigs.debug
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -42,6 +43,10 @@ android {
         }
     }
     namespace = 'jzam.arcedex'
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

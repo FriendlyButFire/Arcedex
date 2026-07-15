@@ -36,7 +36,7 @@ fun PokedexPokemon(
     language: SupportedLanguage,
     pokemon: Pokemon,
     tasks: List<PokeResearch>?,
-    progress: List<ResearchProgress>,
+    progressMap: Map<String, ResearchProgress>,
     pokeSort: PokeSort,
     onGoalClick: (PokeResearch, Int) -> Unit,
     onMoveClick: (String) -> Unit,
@@ -70,7 +70,7 @@ fun PokedexPokemon(
             PokemonHeaderRow(
                 language = language,
                 pokemon = pokemon,
-                progress = progress,
+                progressMap = progressMap,
                 pokeSort = pokeSort,
                 isExpanded = isExpanded,
                 onClick = { isExpanded = !isExpanded }
@@ -102,10 +102,10 @@ fun PokedexPokemon(
 @Composable
 fun PokemonHeaderRow(
     language: SupportedLanguage,
-    pokemon: Pokemon, progress: List<ResearchProgress>, pokeSort: PokeSort, isExpanded: Boolean,
+    pokemon: Pokemon, progressMap: Map<String, ResearchProgress>, pokeSort: PokeSort, isExpanded: Boolean,
     onClick: () -> Unit
 ) {
-    val pokeProgress = progress.find { it.name == pokemon.name }
+    val pokeProgress = progressMap[pokemon.name]
 
     if (pokeProgress != null) {
         val started = pokeProgress.pointsDone > 0
