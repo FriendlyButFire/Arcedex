@@ -18,6 +18,7 @@
 *.keystore
 .kotlin/
 local.properties
+.android/
 # Android Studio 3.6+ - included builds
 .navigation/
 # NDK

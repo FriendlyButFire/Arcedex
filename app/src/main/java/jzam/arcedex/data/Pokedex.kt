@@ -253,4 +253,8 @@ object Pokedex {
     )
     val emptyDex =
         Pokemon(hisuiId = 0, natId = 0, name = "MissingNo.", imgId = R.drawable.sprite000)
+
+    val pokemonByName: Map<String, Pokemon> by lazy {
+        pokedex.associateBy { it.name }
+    }
 }

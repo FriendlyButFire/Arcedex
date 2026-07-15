@@ -3,14 +3,20 @@ package jzam.arcedex.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import jzam.arcedex.data.PokeAreaData
 import jzam.arcedex.data.PokeResearchRepository
 import jzam.arcedex.data.Pokedex
 import jzam.arcedex.models.*
+import jzam.arcedex.utils.getTaskCategory
+import jzam.arcedex.utils.taskCategoryTypeOf
 import jzam.arcedex.utils.translate
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -57,9 +63,9 @@ class PokeResearchViewModel(
     val userPoints: StateFlow<Int> = _userPoints.asStateFlow()
 
     //Map of a Pokemon name to the list of research tasks associated to it for quicker processing
-    private val _pokemonToResearchTasks: MutableStateFlow<Map<String, MutableList<PokeResearch>>> =
+    private val _pokemonToResearchTasks: MutableStateFlow<Map<String, List<PokeResearch>>> =
         MutableStateFlow(emptyMap())
-    val pokemonToResearchTasks: StateFlow<Map<String, MutableList<PokeResearch>>> =
+    val pokemonToResearchTasks: StateFlow<Map<String, List<PokeResearch>>> =
         _pokemonToResearchTasks.asStateFlow()
 
     //Whether completed Pokemon and completed tasks should be hidden from view
@@ -81,69 +87,90 @@ class PokeResearchViewModel(
 
     private var language = SupportedLanguage.ENGLISH
 
-    //Calculates research progress for each Pokemon and builds map of Pokemon name to their research
-    //tasks.
+    //Combined StateFlow that handles filtering off the main thread
+    val filteredPokedex: StateFlow<List<Pokemon>> = combine(
+        pokedex,
+        researchProgress,
+        hideFilter,
+        selectedArea,
+        selectedCategory,
+        selectedCategoryType,
+        pokemonToResearchTasks
+    ) { pokedexList, progressList, hide, area, category, categoryType, tasksMap ->
+        val progressByName = progressList.associateBy { it.name }
+        pokedexList.filter { pokemon ->
+            val prog = progressByName[pokemon.name]
+            when (hide) {
+                HideFilter.SHOW_ALL -> true
+                HideFilter.HIDE_RANK10 -> prog == null || prog.pointsDone < 100
+                HideFilter.HIDE_PERFECT -> prog == null || (prog.pointsDone + prog.bonusEarned) < prog.pointsTotal
+            }
+        }.filter { pokemon ->
+            area == null || PokeAreaData.getAreas(pokemon.hisuiId).contains(area)
+        }.filter { pokemon ->
+            if (category == null) return@filter true
+            val tasks = tasksMap[pokemon.name] ?: return@filter false
+            tasks.any { task ->
+                getTaskCategory(task.task) == category &&
+                        task.goalProgress < task.totalGoals &&
+                        (categoryType == null || taskCategoryTypeOf(category, task.task) == categoryType)
+            }
+        }
+    }.flowOn(Dispatchers.Default)
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = Pokedex.pokedex.sortedBy { it.hisuiId }
+    )
+
+    //Calculates research progress for each Pokemon and builds map of Pokemon name to their research tasks on Dispatchers.Default
     fun calcProgress() {
-        var idx = 0
-        var points = 0
-        val progList: MutableList<ResearchProgress> = mutableListOf()
-        val mapPokemonToResearchTasks: MutableMap<String, MutableList<PokeResearch>> =
-            mutableMapOf()
-        val nameToProgListIdx: MutableMap<String, Int> = mutableMapOf()
-        val taskList = researchTasks.value
-        for (task in taskList) {
-            if (nameToProgListIdx.containsKey(task.name)) {
-                val tempIdx = nameToProgListIdx.getValue(task.name)
-                progList[tempIdx].goalsDone += task.goalProgress
-                progList[tempIdx].goalsTotal += task.totalGoals
-                progList[tempIdx].pointsDone += task.goalProgress * task.points
-                progList[tempIdx].pointsTotal += task.totalGoals * task.points
-                if (progList[tempIdx].pointsDone >= 100) {
-                    progList[tempIdx].bonusEarned = 100
+        viewModelScope.launch(Dispatchers.Default) {
+            val taskList = researchTasks.value
+            var points = 0
+            val progList: MutableList<ResearchProgress> = mutableListOf()
+            val mapPokemonToResearchTasks: MutableMap<String, MutableList<PokeResearch>> =
+                mutableMapOf()
+            val nameToProgListIdx: MutableMap<String, Int> = mutableMapOf()
+
+            for (task in taskList) {
+                val progIdx = nameToProgListIdx[task.name]
+                if (progIdx != null) {
+                    val prog = progList[progIdx]
+                    prog.goalsDone += task.goalProgress
+                    prog.goalsTotal += task.totalGoals
+                    prog.pointsDone += task.goalProgress * task.points
+                    prog.pointsTotal += task.totalGoals * task.points
+                    prog.bonusEarned = if (prog.pointsDone >= 100) 100 else 0
                 } else {
-                    progList[tempIdx].bonusEarned = 0
+                    val newProgress = ResearchProgress(
+                        name = task.name,
+                        goalsDone = task.goalProgress,
+                        goalsTotal = task.totalGoals,
+                        pointsDone = task.goalProgress * task.points,
+                        pointsTotal = task.totalGoals * task.points + 100
+                    )
+                    newProgress.bonusEarned = if (newProgress.pointsDone >= 100) 100 else 0
+                    progList.add(newProgress)
+                    nameToProgListIdx[task.name] = progList.size - 1
                 }
-            } else {
-                val newProgress = ResearchProgress(
-                    name = task.name,
-                    goalsDone = task.goalProgress,
-                    goalsTotal = task.totalGoals,
-                    pointsDone = task.goalProgress * task.points,
-                    //TODO - Adding bonus points here, make this a constant
-                    pointsTotal = task.totalGoals * task.points + 100
-                )
-                if (newProgress.pointsDone >= 100) {
-                    newProgress.bonusEarned = 100
-                } else {
-                    newProgress.bonusEarned = 0
-                }
-                progList.add(idx, newProgress)
-                nameToProgListIdx[task.name] = idx
-                idx += 1
+                mapPokemonToResearchTasks.getOrPut(task.name) { mutableListOf() }.add(task)
             }
-            if (mapPokemonToResearchTasks.contains(task.name)) {
-                mapPokemonToResearchTasks.getValue(task.name).add(task)
-            } else {
-                mapPokemonToResearchTasks[task.name] = mutableListOf(task)
+            for (item in progList) {
+                points += item.pointsDone + item.bonusEarned
             }
+            _researchProgress.value = progList
+            _pokemonToResearchTasks.value = mapPokemonToResearchTasks
+            _userPoints.value = points
         }
-        for (item in progList) {
-            points += item.pointsDone + item.bonusEarned
-        }
-        _researchProgress.value = progList
-        _pokemonToResearchTasks.value = mapPokemonToResearchTasks
-        _userPoints.value = points
     }
 
-    //Sorts a Pokemon list according to the current sort mode. Shared by setSort and searchClear
-    //so the sort logic (including the research-level tie-break) only lives in one place.
+    //Sorts a Pokemon list according to the current sort mode.
     private fun sortedPokedex(list: List<Pokemon>): List<Pokemon> {
         return when (_pokesort.value) {
             PokeSort.ALPHABETICAL -> list.sortedBy { translate(language, it.name) }
             PokeSort.NATIONAL -> list.sortedBy { it.natId }
             PokeSort.RESEARCH_LEVEL -> {
-                //Most progress first (Perfect, then Rank10, then in-progress, then untouched),
-                //tie-broken by Hisui dex order
                 val progressByName = _researchProgress.value.associateBy { it.name }
                 list.sortedWith(
                     compareByDescending<Pokemon> { pokemon ->
@@ -156,64 +183,55 @@ class PokeResearchViewModel(
         }
     }
 
-    //Set and execute the sorting.
+    //Set and execute the sorting off main thread.
     fun setSort(sort: PokeSort) {
         _pokesort.value = sort
-        _pokedex.value = sortedPokedex(pokedex.value)
+        viewModelScope.launch(Dispatchers.Default) {
+            _pokedex.value = sortedPokedex(pokedex.value)
+        }
     }
 
-    //Search for given text in research task list. Can match on Pokemon name or description of a
-    //task. Set Pokemon list to filtered list. Trims whitespace and ignores blank searches.
+    //Search for given text in research task list off main thread.
     fun searchPokedex(searchText: String) {
         val trimmed = searchText.trim()
         if (trimmed.isBlank()) {
-            // Blank / whitespace-only search would previously match everything via contains("").
-            // Treat as clear (show all) rather than empty result.
             searchClear()
             return
         }
-        searchClear()
-        var idx = 0
-        val matchingPokemon: MutableList<Pokemon> = mutableListOf()
-        val nameToListIdx: MutableMap<String, Int> = mutableMapOf()
-        val taskList = researchTasks.value
-        val oldPokedex = pokedex.value
-        var translatedName: String
-        var translatedTask: String
-        val findText = translate(language, trimmed).lowercase()
-        for (task in taskList) {
-            translatedName = translate(language, task.name).lowercase()
-            translatedTask = translate(language, task.task).lowercase()
-            if (!nameToListIdx.containsKey(task.name) &&
-                (translatedName.contains(findText) ||
-                        translatedTask.contains(findText))
-            ) {
-                for (pokemon in oldPokedex) {
-                    if (pokemon.name == task.name) {
-                        matchingPokemon.add(idx, pokemon)
-                        nameToListIdx[task.name] = idx
-                        idx += 1
-                        break
+        viewModelScope.launch(Dispatchers.Default) {
+            val matchingPokemon: MutableList<Pokemon> = mutableListOf()
+            val addedNames = mutableSetOf<String>()
+            val taskList = researchTasks.value
+            val findText = translate(language, trimmed).lowercase()
+
+            for (task in taskList) {
+                if (addedNames.contains(task.name)) continue
+                val translatedName = translate(language, task.name).lowercase()
+                val translatedTask = translate(language, task.task).lowercase()
+                if (translatedName.contains(findText) || translatedTask.contains(findText)) {
+                    val pokemon = Pokedex.pokemonByName[task.name]
+                    if (pokemon != null) {
+                        matchingPokemon.add(pokemon)
+                        addedNames.add(task.name)
                     }
                 }
             }
+            _pokedex.value = sortedPokedex(matchingPokemon)
+            _inSearchMode.value = false
+            _searchedText.value = trimmed
         }
-        _pokedex.value = matchingPokemon
-        _inSearchMode.value = false
-        _searchedText.value = trimmed
-        setSort(pokesort.value)
     }
 
-    //Reset the search variables
+    //Reset the search variables off main thread
     fun searchClear() {
-        _pokedex.value = sortedPokedex(Pokedex.pokedex)
-        _searchedText.value = ""
-        _inSearchMode.value = true
+        viewModelScope.launch(Dispatchers.Default) {
+            _pokedex.value = sortedPokedex(Pokedex.pokedex)
+            _searchedText.value = ""
+            _inSearchMode.value = true
+        }
     }
 
-    //Set the goal progress for a task based on what the user clicked. If they clicked the current
-    //goal progress, reset progress to 0. Updating the task does not trigger recomposition, so
-    //making a copy with changed values, deleting the original, and inserting copy instead.
+    //Set the goal progress for a task based on what the user clicked.
     fun onGoalClick(task: PokeResearch, goalNum: Int) {
         viewModelScope.launch {
             val savTask = task.copy()
@@ -233,9 +251,7 @@ class PokeResearchViewModel(
     //Builds a copy-pasteable backup string of current research progress
     fun exportProgressBackup(): String = jzam.arcedex.utils.exportProgress(researchTasks.value)
 
-    //Parses and applies a backup string, returning the number of tasks that were actually
-    //updated. Throws IllegalArgumentException (with a user-facing message) if the string isn't a
-    //valid backup produced by this app.
+    //Parses and applies a backup string, returning the number of tasks that were actually updated.
     suspend fun importProgressBackup(backup: String): Int {
         val entries = jzam.arcedex.utils.parseBackup(backup)
         val currentTasks = researchTasks.value
@@ -265,10 +281,7 @@ class PokeResearchViewModel(
         _selectedArea.value = area
     }
 
-    //Set which research task category to filter the Pokemon list to. Resets the secondary type
-    //filter whenever the category changes, since a type only makes sense paired with the
-    //category it was chosen under (e.g. picking Defeat, then Fire, then switching to Catch
-    //shouldn't silently keep "Fire" applied to a category that has no type dimension)
+    //Set which research task category to filter the Pokemon list to.
     fun setCategoryFilter(category: TaskCategory?) {
         _selectedCategory.value = category
         _selectedCategoryType.value = null

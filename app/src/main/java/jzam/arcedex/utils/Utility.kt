@@ -138,6 +138,16 @@ fun getMoveType(task: String): String {
     return ""
 }
 
+//Extracts the type relevant to a given category's task text - Defeat tasks embed the type
+//directly ("...with Fire-type moves"), Move Seen tasks need a move-name lookup via getMoveType()
+fun taskCategoryTypeOf(category: TaskCategory, taskText: String): String {
+    return when (category) {
+        TaskCategory.DEFEAT -> getDefeatType(taskText)
+        TaskCategory.MOVE_SEEN -> getMoveType(taskText)
+        else -> ""
+    }
+}
+
 //Categorizes a research task's text into a TaskCategory "verb", independent of which Pokemon it
 //belongs to. Matched against the fixed set of task phrasings used throughout PokeResearchData -
 //uses "." in place of the apostrophe in regexes since the source data uses a typographic

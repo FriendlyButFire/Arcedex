@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Preserve Room models, entities, and DAOs
+-keep class jzam.arcedex.models.** { *; }
+-keep class jzam.arcedex.data.** { *; }

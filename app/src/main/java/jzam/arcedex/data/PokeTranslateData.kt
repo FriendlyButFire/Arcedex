@@ -674,6 +674,9 @@ object PokeTranslateData {
         PokeTranslate(oldText = "-type", newText = "タイプ")
     )
 
-    //Supported languages
     val languages = listOf("en", "ja")
+
+    val jpTranslationMap: Map<String, String> by lazy {
+        jp.associate { it.oldText to it.newText }
+    }
 }
