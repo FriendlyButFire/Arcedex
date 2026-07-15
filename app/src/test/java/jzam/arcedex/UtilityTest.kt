@@ -19,14 +19,15 @@ class UtilityTest {
     @Test
     fun testResearchRankCalculation() {
         assertEquals("Research Rank 0", getResearchRank(SupportedLanguage.ENGLISH, 0))
-        assertEquals("Research Rank 1", getResearchRank(SupportedLanguage.ENGLISH, 100))
+        assertEquals("Research Rank 0", getResearchRank(SupportedLanguage.ENGLISH, 100))
+        assertEquals("Research Rank 1", getResearchRank(SupportedLanguage.ENGLISH, 500))
         assertEquals("Research Rank 10", getResearchRank(SupportedLanguage.ENGLISH, 125100))
     }
 
     @Test
     fun testPointsToNextRankText() {
         val text = getPointsToNextRankText(SupportedLanguage.ENGLISH, 0)
-        assertTrue(text.contains("100") || text.contains("Points to next rank"))
+        assertTrue(text.contains("500") || text.contains("Points to next rank"))
     }
 
     @Test

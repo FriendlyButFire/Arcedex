@@ -2,9 +2,10 @@ package jzam.arcedex.utils
 
 import jzam.arcedex.models.PokeResearch
 import java.io.ByteArrayOutputStream
-import java.util.Base64
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /*
  * Backup/restore for research progress. Only goalProgress is exported (per Pokemon+task) since
@@ -17,6 +18,7 @@ private const val BACKUP_VERSION = 1
 private const val INVALID_BACKUP_MESSAGE = "This doesn't look like a valid Arcedex backup code."
 
 //Builds a compact backup string containing only tasks with actual progress (goalProgress > 0).
+@OptIn(ExperimentalEncodingApi::class)
 fun exportProgress(tasks: List<PokeResearch>): String {
     val json = buildString {
         append("{\"version\":").append(BACKUP_VERSION).append(",\"progress\":[")
@@ -36,15 +38,16 @@ fun exportProgress(tasks: List<PokeResearch>): String {
         GZIPOutputStream(byteStream).use { it.write(json.toByteArray(Charsets.UTF_8)) }
         byteStream.toByteArray()
     }
-    return Base64.getEncoder().encodeToString(gzipped)
+    return Base64.encode(gzipped)
 }
 
 //Parses a backup string produced by exportProgress. Throws IllegalArgumentException with a
 //user-facing message if the string isn't a valid backup.
+@OptIn(ExperimentalEncodingApi::class)
 fun parseBackup(backup: String): List<Triple<String, String, Int>> {
     val gzipped = try {
-        Base64.getDecoder().decode(backup.trim())
-    } catch (e: IllegalArgumentException) {
+        Base64.decode(backup.trim())
+    } catch (e: Exception) {
         throw IllegalArgumentException(INVALID_BACKUP_MESSAGE)
     }
     val json = try {

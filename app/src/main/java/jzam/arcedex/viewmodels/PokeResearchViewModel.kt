@@ -20,6 +20,13 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+private data class FilterState(
+    val hideFilter: HideFilter = HideFilter.SHOW_ALL,
+    val selectedArea: HisuiArea? = null,
+    val selectedCategory: TaskCategory? = null,
+    val selectedCategoryType: String? = null
+)
+
 /*
  * ViewModel for the main (and currently the only) Arcedex screen
  */
@@ -87,41 +94,51 @@ class PokeResearchViewModel(
 
     private var language = SupportedLanguage.ENGLISH
 
+    private val filterState: StateFlow<FilterState> = combine(
+        hideFilter,
+        selectedArea,
+        selectedCategory,
+        selectedCategoryType
+    ) { hide, area, category, categoryType ->
+        FilterState(hide, area, category, categoryType)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = FilterState()
+    )
+
     //Combined StateFlow that handles filtering off the main thread
     val filteredPokedex: StateFlow<List<Pokemon>> = combine(
         pokedex,
         researchProgress,
-        hideFilter,
-        selectedArea,
-        selectedCategory,
-        selectedCategoryType,
-        pokemonToResearchTasks
-    ) { pokedexList, progressList, hide, area, category, categoryType, tasksMap ->
+        pokemonToResearchTasks,
+        filterState
+    ) { pokedexList, progressList, tasksMap, filters ->
         val progressByName = progressList.associateBy { it.name }
         pokedexList.filter { pokemon ->
             val prog = progressByName[pokemon.name]
-            when (hide) {
+            when (filters.hideFilter) {
                 HideFilter.SHOW_ALL -> true
                 HideFilter.HIDE_RANK10 -> prog == null || prog.pointsDone < 100
                 HideFilter.HIDE_PERFECT -> prog == null || (prog.pointsDone + prog.bonusEarned) < prog.pointsTotal
             }
         }.filter { pokemon ->
-            area == null || PokeAreaData.getAreas(pokemon.hisuiId).contains(area)
+            filters.selectedArea == null || PokeAreaData.getAreas(pokemon.hisuiId).contains(filters.selectedArea)
         }.filter { pokemon ->
-            if (category == null) return@filter true
+            val category = filters.selectedCategory ?: return@filter true
             val tasks = tasksMap[pokemon.name] ?: return@filter false
             tasks.any { task ->
                 getTaskCategory(task.task) == category &&
                         task.goalProgress < task.totalGoals &&
-                        (categoryType == null || taskCategoryTypeOf(category, task.task) == categoryType)
+                        (filters.selectedCategoryType == null || taskCategoryTypeOf(category, task.task) == filters.selectedCategoryType)
             }
         }
     }.flowOn(Dispatchers.Default)
-    .stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = Pokedex.pokedex.sortedBy { it.hisuiId }
-    )
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = Pokedex.pokedex.sortedBy { it.hisuiId }
+        )
 
     //Calculates research progress for each Pokemon and builds map of Pokemon name to their research tasks on Dispatchers.Default
     fun calcProgress() {
